@@ -401,6 +401,8 @@ def main():
             num_steps=args.num_steps or 0,
             batch_size=args.batch_size,
             world_size=ws_guess,
+            num_epochs=args.num_epochs,
+            val_interval=args.val_interval,
         )
     )
 

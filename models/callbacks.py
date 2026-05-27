@@ -414,21 +414,25 @@ class LimitRun(Callback):
 
 
 class TrainTiming(Callback):
-    """Per-step wall-time + extrapolated GPU-h logging for finetune runs.
+    """Per-step + per-epoch wall-time + extrapolated GPU-h logging for finetune runs.
 
     Why this exists: we need a precise GPU-h/task estimate before committing to a
-    300k-step run, and to A/B speedup changes against a stable baseline.
+    300k-step run, and to A/B speedup changes against a stable baseline. The
+    paper's 46 GPU-h figure is end-to-end wall-clock — train compute + val + test
+    + dataloader-reload + checkpoint write — so a compute-only extrapolation
+    strictly undercounts and is apples-vs-oranges. We report both numbers.
 
-    Each `on_train_batch_end` records elapsed wall time since the previous batch
-    (excluding val, which Lightning pauses between). We skip the first
-    `warmup_batches` measurements — CUDA/cuDNN warmup, dataloader spin-up, and
-    PL's epoch-init bookkeeping inflate the first batches and would bias any
-    rolling mean.
+    Per-batch: `on_train_batch_end` records inter-batch wall time and we keep a
+    rolling-window mean (skip first `warmup_batches` for CUDA/dataloader warmup).
+    Per-epoch: `on_train_epoch_start` records `now - prev_start`, which is the
+    full epoch wall including the val+reload+ckpt boundary; subtract
+    `mean_step_s × steps_per_epoch` to isolate the non-compute overhead. Post-fit
+    `trainer.test()` is timed separately via `on_test_epoch_*`.
 
-    Logs per-step `train/step_time_ms`, `train/throughput_samp_per_s`, and
-    `train/extrapolated_gpu_h_total` (using `num_steps * world_size`) so a short
-    probe is enough to predict the full-run cost. Prints a summary line at
-    epoch end. All logging is gated to global_rank==0 to avoid DDP duplication.
+    Logs `train/step_time_ms`, `train/throughput_samp_per_s`,
+    `train/extrapolated_gpu_h_total` (compute only, unchanged for back-compat),
+    and `train/extrapolated_wall_h_total` (compute + per-epoch overhead +
+    post-fit test). All gated to global_rank==0 to avoid DDP duplication.
     """
 
     def __init__(
@@ -439,6 +443,8 @@ class TrainTiming(Callback):
         warmup_batches: int = 50,
         window: int = 200,
         log_every: int = 50,
+        num_epochs: int | None = None,
+        val_interval: int = 1,
     ):
         super().__init__()
         self.num_steps = num_steps
@@ -447,14 +453,78 @@ class TrainTiming(Callback):
         self.warmup_batches = warmup_batches
         self.window = window
         self.log_every = log_every
+        # Used to extrapolate per-epoch overhead over the full planned run.
+        # If both num_epochs and num_steps are set, we use whichever Lightning
+        # hits first (min). Set num_steps=0 to ignore the steps gate.
+        self.num_epochs = num_epochs
+        self.val_interval = max(1, val_interval)
+
+        # Per-step (rolling-window) inter-batch time.
         self._buf: list[float] = []
         self._last_t: float | None = None
         self._seen: int = 0
+
+        # Per-epoch full wall time (train + val + reload + ckpt). Skip the first
+        # observed boundary because the first epoch includes one-shot warmup
+        # (compile, dataloader spin-up, sanity-val).
+        self._epoch_wall_buf: list[float] = []
+        self._prev_epoch_start_t: float | None = None
+        self._steps_per_epoch: int | None = None
+
+        # Post-fit `trainer.test()` duration. Captured once.
+        self._test_epoch_s: float | None = None
+        self._test_t0: float | None = None
+
+    def _planned_train_epochs(self) -> float | None:
+        # Lightning stops at min(max_steps, max_epochs). Mirror that here so the
+        # extrapolation matches whatever the run will actually do.
+        n_from_steps = None
+        if self.num_steps and self.num_steps > 0 and self._steps_per_epoch:
+            n_from_steps = self.num_steps / self._steps_per_epoch
+        if self.num_epochs and n_from_steps is not None:
+            return min(self.num_epochs, n_from_steps)
+        return self.num_epochs or n_from_steps
+
+    def _extrapolate(self) -> tuple[float, float, float]:
+        """Returns (mean_step_s, compute_gpu_h, wall_gpu_h)."""
+        if not self._buf:
+            return 0.0, 0.0, 0.0
+        step_s = float(np.mean(self._buf))
+        compute_h = step_s * self.num_steps / 3600.0 * self.world_size
+
+        wall_h = compute_h
+        train_epochs = self._planned_train_epochs()
+        if self._epoch_wall_buf and self._steps_per_epoch and train_epochs:
+            # Median over a few epochs to be robust to a one-off ckpt-write
+            # spike. Overhead = epoch wall - compute portion of that epoch.
+            epoch_wall_s = float(np.median(self._epoch_wall_buf))
+            overhead_s = max(0.0, epoch_wall_s - step_s * self._steps_per_epoch)
+            total_overhead_s = overhead_s * train_epochs
+            wall_h = (step_s * self.num_steps + total_overhead_s) * self.world_size / 3600.0
+        if self._test_epoch_s is not None:
+            wall_h += self._test_epoch_s * self.world_size / 3600.0
+        return step_s, compute_h, wall_h
 
     def on_train_epoch_start(self, trainer, pl_module):
         # Reset the inter-batch clock — the gap across an epoch boundary spans
         # validation + dataloader recreation, which would skew the next sample.
         self._last_t = None
+
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        now = time.perf_counter()
+        if self._prev_epoch_start_t is not None and self._seen > self.warmup_batches:
+            # Full epoch wall, including the just-finished val/reload/ckpt boundary.
+            self._epoch_wall_buf.append(now - self._prev_epoch_start_t)
+            if len(self._epoch_wall_buf) > 5:
+                self._epoch_wall_buf.pop(0)
+        self._prev_epoch_start_t = now
+
+        # Capture steps/epoch once. Lightning sets this before train_epoch_start.
+        if self._steps_per_epoch is None:
+            n = getattr(trainer, "num_training_batches", None)
+            if isinstance(n, int) and n > 0 and n != float("inf"):
+                self._steps_per_epoch = n
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         # Use a CUDA sync to make wall-time reflect actual GPU completion, not
@@ -481,17 +551,16 @@ class TrainTiming(Callback):
         if self._seen % self.log_every != 0:
             return
 
-        arr = np.asarray(self._buf)
-        step_ms = float(arr.mean() * 1000.0)
-        thru = self.batch_size / float(arr.mean())
-        gpu_h_total = float(arr.mean()) * self.num_steps / 3600.0 * self.world_size
+        step_s, compute_h, wall_h = self._extrapolate()
         if trainer.logger is not None:
+            arr = np.asarray(self._buf)
             trainer.logger.log_metrics(
                 {
-                    "train/step_time_ms": step_ms,
+                    "train/step_time_ms": step_s * 1000.0,
                     "train/step_time_ms_std": float(arr.std() * 1000.0),
-                    "train/throughput_samp_per_s": thru,
-                    "train/extrapolated_gpu_h_total": gpu_h_total,
+                    "train/throughput_samp_per_s": self.batch_size / step_s,
+                    "train/extrapolated_gpu_h_total": compute_h,
+                    "train/extrapolated_wall_h_total": wall_h,
                 },
                 step=trainer.global_step,
             )
@@ -499,17 +568,45 @@ class TrainTiming(Callback):
     def on_train_epoch_end(self, trainer, pl_module):
         if trainer.global_rank != 0 or len(self._buf) < 5:
             return
-        arr = np.asarray(self._buf)
-        mean_s = float(arr.mean())
-        std_s = float(arr.std())
-        gpu_h_total = mean_s * self.num_steps / 3600.0 * self.world_size
+        step_s, compute_h, wall_h = self._extrapolate()
+        std_s = float(np.std(self._buf))
+        epoch_overhead_s = 0.0
+        if self._epoch_wall_buf and self._steps_per_epoch:
+            epoch_overhead_s = max(
+                0.0, float(np.median(self._epoch_wall_buf)) - step_s * self._steps_per_epoch
+            )
         print(
             f"[TrainTiming] epoch {trainer.current_epoch}: "
-            f"step={mean_s*1000:.1f}±{std_s*1000:.1f} ms  "
-            f"thru={self.batch_size/mean_s:.1f} samp/s  "
-            f"extrapolated GPU-h({self.num_steps} steps × {self.world_size} GPU)={gpu_h_total:.1f}",
+            f"step={step_s*1000:.1f}±{std_s*1000:.1f} ms  "
+            f"thru={self.batch_size/step_s:.1f} samp/s  "
+            f"epoch_overhead={epoch_overhead_s:.1f}s  "
+            f"compute GPU-h({self.num_steps} steps × {self.world_size})={compute_h:.1f}  "
+            f"wall GPU-h={wall_h:.1f}",
             flush=True,
         )
+
+    # `trainer.test()` (post-fit) and any in-fit standalone test pass land here;
+    # in-fit val that *also* iterates the test loader (data/loaders.py:213) does
+    # not — that goes through on_validation_epoch_*, already accounted for inside
+    # the per-epoch wall measurement.
+    def on_test_epoch_start(self, trainer, pl_module):
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        self._test_t0 = time.perf_counter()
+
+    def on_test_epoch_end(self, trainer, pl_module):
+        if self._test_t0 is None:
+            return
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        self._test_epoch_s = time.perf_counter() - self._test_t0
+        self._test_t0 = None
+        if trainer.global_rank == 0:
+            print(
+                f"[TrainTiming] post-fit test epoch: {self._test_epoch_s:.1f}s "
+                f"({self._test_epoch_s * self.world_size / 3600.0:.3f} GPU-h)",
+                flush=True,
+            )
 
 
 def _save_checkpoint(out_path, trainer, reason="time limit"):
