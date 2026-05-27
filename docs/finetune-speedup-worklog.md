@@ -61,4 +61,6 @@ The paper's reference command (`python train.py --conf … --load-model …`) an
 
 Submission script: `scripts/finetune/full_canonical_packed.sbatch`. All lanes use `--load-model` against the local `ct-scd-pcq` checkpoint. Each runs 349 epochs ≈ 9.5h wall on the slowest arm. Logs at `$SCRATCH/SCD_data/finetune_runs/<jobid>_canonical/<tag>/train.log`.
 
+**53465532 cancelled after 2 min.** First submission lost 2/3 lanes to a DDP `EADDRINUSE` on the default master port — PL spins up a DDP master per process even under `distributed_backend=ddp` with one GPU, and three lanes on the same host raced for port 20532. Fixed by setting `MASTER_PORT=29500+gpu_index` per lane (commit `a56441a`). Resubmitted as **53465652**.
+
 Acceptance: HOMO MAE ≤ 14 meV for the baseline lane (paper 12.7 meV ± 10%). Phase 2 candidates additionally within ±0.5 meV of the baseline lane (training-dynamics invariant). Report both `compute GPU-h` and `wall GPU-h` (the latter is the apples-to-apples comparison to the paper's 46).

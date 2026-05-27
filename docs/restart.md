@@ -4,7 +4,7 @@ Snapshot: 2026-05-26 ~22:30 PDT. The previous agent landed Phase 2.5 (apples-to-
 
 ## TL;DR
 
-- **Slurm job 53465532** (one sbatch, three lanes): `full_kernel_on`, `full_tf32`, `full_tf32_compile`. Live in `$SCRATCH/SCD_data/finetune_runs/53465532_canonical/<tag>/train.log` once running. Each lane is single-GPU (`CUDA_VISIBLE_DEVICES=0/1/2`), `--load-model <local-ckpt>`, 349 whole epochs. Walltime allocation 11h; the slowest arm (baseline) extrapolates ~9.5h.
+- **Slurm job 53465652** (one sbatch, three lanes): `full_kernel_on`, `full_tf32`, `full_tf32_compile`. Live in `$SCRATCH/SCD_data/finetune_runs/53465652_canonical/<tag>/train.log` once running. Each lane is single-GPU (`CUDA_VISIBLE_DEVICES=0/1/2`, distinct `MASTER_PORT`), `--load-model <local-ckpt>`, 349 whole epochs. Walltime allocation 11h; the slowest arm (baseline) extrapolates ~9.5h. (Earlier 53465532 cancelled after 2 min — DDP port collision, fixed in commit `a56441a`.)
 - Phase 2.5 commits: `c0789a1` (TrainTiming wall-h + tests), `e474f9e` (refactor for num_steps=-1), `e0effc0` (whole-epochs config), `e01aa6c` (profile sbatch).
 - Resubmission commits: `153455e` (new packed sbatch), `e64f8c5` (worklog).
 - `--load-model` decision rationale + per-commit summary now live in `docs/finetune-speedup-worklog.md` under "Phase 2.5" + "load-model vs load-hf".
