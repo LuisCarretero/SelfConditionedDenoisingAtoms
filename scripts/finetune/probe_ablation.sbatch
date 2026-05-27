@@ -10,13 +10,15 @@
 #
 #SBATCH -A m5068_g
 #SBATCH -C gpu
-#SBATCH -q premium
+#SBATCH -q shared
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=32
 #SBATCH --gpu-bind=none
 #SBATCH -t 00:45:00
+# `shared` (a.k.a. gpu_shared) is per-GPU billing (1× factor). Using `premium`
+# or `regular` for a 1-GPU probe pays for 4 GPUs since both are full-node QoS.
 #SBATCH -J scd_probe_ab
 #SBATCH -o /global/u1/l/luisc440/workspace/SelfConditionedDenoisingAtoms/slurm_logs/probeab_%j.out
 #SBATCH -e /global/u1/l/luisc440/workspace/SelfConditionedDenoisingAtoms/slurm_logs/probeab_%j.err
