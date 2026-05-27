@@ -1,0 +1,39 @@
+
+\begin{table*}[t]
+    \centering
+    \caption{Summary of Pretraining and Benchmarking Datasets}
+    \label{tab:dataset_summary}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.15}
+    
+    % \begin{adjustbox}{max width=\linewidth}
+    \begin{tabular}{l l l l l}
+    % \begin{tabularx}{\textwidth}{l X l l X}
+   
+    \toprule
+         Pretraining Dataset&  Domain&  Unique Structures & Total Geometries& Origin/functional\\
+         \midrule
+         \textbf{PCQ} (PCQM4Mv2) & Small Molecules &  3.378M &  3.378M & B3LYP/6-31G* DFT\\
+         \textbf{GEOM10} & Small Molecules &  304,339&  2.7M& GFN2-xTB , conformers\\
+         \textbf{AMP20} (Alex-MP-20)  &  Periodic Materials &  607,673&  607,673& PBEsol DFT\\
+         \textbf{SAIR} &  Protein-Ligand &    888k& 4.4M& Boltz-1x, conformers \\
+         \textbf{ALL} (AllAtoms) &  Above, mixed & 5.2M & 11.3M & PCQ, GEOM10, AMP20, SAIR \\
+         \textbf{OMol25} (4M split) &  mixed organic molecules&  ---  &  4M & MD, Non-equilibrium\\
+         
+        \midrule
+        Benchmarking Dataset &  Domain &  Training Set Geometries &  \multicolumn{2}{l}{Task}\\
+        \midrule
+        \textbf{QM9} & Small Molecules  &  110k &  \multicolumn{2}{l}{properties computed from DFT}\\
+        \textbf{Matbench} (mp gap) & Periodic Materials  & 85k &  \multicolumn{2}{l}{band gap energy computed from DFT} \\
+        \textbf{LBA} & Protein-Ligand & 4k &  \multicolumn{2}{l}{ligand binding affinity ($-log(K_d) $) } \\
+        % MD17 & Organic small molecules  &  10k &  \multicolumn{2}{l} {DFT Force/Energy}\\    
+    \bottomrule
+    \end{tabular}
+    % \end{tabularx}
+    % \end{adjustbox}
+    
+    % \label{dataset_summary}
+    % \label{tab:placeholder}
+    \footnotesize PCQ\cite{PubChemQC_Nakata2017}, GEOM\cite{GEOM_axelrod2022}, AMP20\cite{MaterialsProject, Alexandria_1, Alexandria_2}, SAIR \cite{Sair_dataset}, OMol25\cite{OMOL25_levine2025open},  Boltz-1x \cite{boltz1_2024}, QM9\cite{QM9_Ramakrishnan2014}, Matbench\cite{matbench_2020}, LBA\cite{LBA_dataset} 
+\end{table*}

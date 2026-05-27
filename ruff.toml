@@ -1,0 +1,24 @@
+# Ruff config. Invoke via `pixi run lint` (report) / `pixi run fix` (autofix).
+# Starting point is deliberately moderate — see the linter discussion before
+# widening `select`.
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes — real bugs: undefined / unused names
+    "W",   # pycodestyle warnings
+    "I",   # isort — import ordering
+    "UP",  # pyupgrade — modernize syntax for our py3.12 floor
+    "B",   # flake8-bugbear — likely-wrong constructs
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "C408",   # dict(a=1) keyword form is preferred here over {"a": 1} literals
+    "SIM108", # ternaries from if/else blocks often read worse, not better
+]
+
+[lint.isort]
+known-first-party = ["models", "data"]

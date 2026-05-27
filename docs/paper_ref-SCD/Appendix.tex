@@ -1,0 +1,210 @@
+
+
+% \subsection{Why Does Self-Supervised Learning Matter for 3D Atomistic data?}
+% In other fields, the paradigm shift towards foundation models would not have been possible without the development of self-supervised learning  objectives that enabled pretraining on vast, heterogeneous, and largely unlabeled datasets. However, the complex structure of 3D atomistic data poses a unique challenge for the development of effective self-supervised learning objectives. Further, in physical chemistry and materials science, 3D geometries are often generated using expensive DFT relaxations or simulations, which also yield corresponding force and energy labels. Consequently, the fraction of 3D geometries with force–energy labels is relatively high compared to other data modalities such as text or images. This abundance has made large-scale supervised pretraining a feasible path for progress in the field, driving consistent improvements with scale. However, the relative prevalence of "ground-truth" (DFT based) force-energy labels is unlikely to remain the case in the near future as emerging foundation potentials and diffusion-based generative models provide far more efficient routes to obtaining 3D geometries than DFT.
+
+\section{Practical Notes on Node Denoising }
+\label{denoising_details}
+
+\subsection{Interpreting Noise Scales} 
+We find that the scale of noise applied to atomistic structures plays a significant role in its utility as a pretraining or regularization tool. Here we formalize two distinct regimes:
+
+\textbf{Regularizing noise} utilizes a small scale with respect to bond length (single bonds range from $\sim$ 1.0 to 2.0\AA ), such as $\sigma \approx 0.005\text{\AA}$), in order to reduce overfitting. At this scale gaussian noise does not alter single-double bond distinguishability, and is often used as an auxiliary task \cite{NoisyNodes_Godwin2022,Equiformer1_Liao2022, EquiformerV2_Liao2023}. We find that regularizing noise improves downstream results when used in SCD pretraining (on non-corrupted inputs) and performance during some finetuning tasks, but not all.
+
+\textbf{Corruption noise} used for pretraining, is typically one order of magnitude larger ($\sigma \approx 0.04\text{\AA}$), and often perturbs molecular geometries enough to disrupt single/double/triple bond identities (+/- 0.1\AA), but without moving atoms far enough to be considered bond breaking. We find that noise scales much larger than this harm pretraining performance. 
+
+
+\subsection{Reinterpreting Denoising for Atomistic Systems}
+Many previous works have suggested a relationship between denoising objectives and learning `force fields'; however, we do not find this to be a useful hypothesis for why denoising benefits representation. It is often implied that the `field' learned by noise prediction is beneficial due to its similarity to DFT forces, yet prior work has shown that noise vectors on ground-state geometries correlate poorly with true DFT forces \cite{SliDe_Ni2025}. Consistent with this, we find that for our models trained on ground-truth DFT forces, adding an auxiliary node denoising objective harms performance on property prediction, suggesting a low similarity between these targets (see Table \ref{tab:fe_finetune}).
+
+Instead, we hypothesize that denoising objectives succeed because they encourage the development of smooth, distinguishable local atom embeddings. SCD complements this by introducing a global semantic objective. Through this lens, we attribute the transferability of force-energy pretraining to its demand for high geometric sensitivity and representational complexity, rather than to its explicit connection to physical principles. Force prediction encourages equivariant sensitivity to local perturbations, while energy prediction promotes global representation. Based on this hypothesis, we suggest that self-supervised learning methods should employ reconstruction or de-corruption objectives that challenge models with both local and global objectives similar to force-energy pretraining and SCD. 
+
+
+
+\section{Backbone Architecture and Implementation}
+\label{Arch_and_implement_appendix}
+
+Self-Conditioned Denoising pretraining can be implemented with any architecture designed for diffusion. To modify an existing non-conditional GNN for SCD pretraining, we replace the pre-norm of each message passing layer with an adaptive layer norm (AdaNorm), similar to a diffusion transformer \cite{DiT_peebles2023}. 
+
+figure \ref{fig:adanorm} diagrams our implementation of AdaNorm used for SCD. Because SCD pretraining requires two forward passes per-step we find that including drop path with a drop probability of 0.1 improves training stability and provides an additional form of regularization. Our drop path is implemented to jointly drop both L0 and L1 embeddings. During pretraining we also freeze atom type/element embeddings. Without freezing element embeddings, we find that element embeddings become vanishingly small, leading to downstream instability. On github \cite{UnstableCoord_Zaidi2023GitHubIssue}, previous authors have noted challenges (gradient explosion) during the downstream fine tuning of models trained by standard node-denoising pretraining (aka 'coord') - likely a result of small or zeroed out embedding vectors.
+
+
+Table ~\ref{tab:arch_speed_mem} shows a breakdown of parameter count, speed, and memory usage for the architectures used in this work. Each architecture shown uses the same embedding size (256), number of layers (8), and number of attention heads (8). CT and CGT correspond to the modified architectures of ET and GET that incorporate conditional layer norms. In this table, we can see that adding conditional guidance to an architecture has little effect on its speed and memory usage as compared to the addition of edge updates and angle embeddings. CT is overall 4 times faster, almost half the size, and has half the peak memory usage as GET. 
+
+% \begin{table}[t]
+% \centering
+% \caption{Architecture speed and memory comparison on QM9 samples (batch size 128, averaged over 32 batches on an RTX~A5000). All models listed have the same embedding dimension, number of layers, and number of attention heads}
+% \label{tab:arch_speed_mem}
+
+% % --------- Subtable A: raw metrics ----------
+% \begin{subtable}{\linewidth}
+% \centering
+% \caption{Latency, throughput, and memory (absolute).}
+% \label{tab:arch_speed_mem_abs}
+% \begin{adjustbox}{max width=\linewidth}
+% \begin{tabular}{l c c c c c}
+% \toprule
+% \textbf{Arch} &
+% \textbf{Backbone Params (M)} &
+% \shortstack[c]{\textbf{forward pass (ms)}\\\textbf{(Eval / Train)}} &
+% \shortstack[c]{\textbf{samples/sec}\\\textbf{(Eval / Train)}} &
+% \shortstack[c]{\textbf{Avg Mem (GB)}\\\textbf{(Eval / Train)}} &
+% \shortstack[c]{\textbf{Peak Mem (GB)}\\\textbf{(Eval / Train)}} \\
+% \midrule
+% ET   & 6.53  & 65.7 / 69.13   & 1946.4 / 879.7 & 0.040 / 0.128 & 1.07 / 8.47 \\
+% CT  & 9.17  & 70.59 / 74.5   & 1811.6 / 802.1 & 0.050 / 0.148 & 1.08 / 9.00 \\GET (Frad/SliDe) & 13.39 & 264.9 / 369.5 & 483.1 / 193.8 & 0.067 / 0.18  & 1.62 / 20.37 \\
+% CGT & 16.03 & 262.8 / 379.3 & 486.8 / 189.0 & 0.076 / 0.20  & 1.63 / 20.72 \\
+% \bottomrule
+% \end{tabular}
+% \end{adjustbox}
+% \end{subtable}
+
+% \vspace{0.6em}
+% % --------- Subtable B: relative metrics ----------
+% \begin{subtable}{\linewidth}
+% \centering
+% \caption{Relative metrics (normalized to ET).}
+% \label{tab:arch_speed_mem_rel}
+% \begin{adjustbox}{max width=\linewidth}
+% \begin{tabular}{l c c c}
+% \toprule
+% \textbf{Arch} &
+% \shortstack[c]{\textbf{Rel. Mem to ET}\\\textbf{(Eval / Train)}} &
+% \shortstack[c]{\textbf{Rel. Speed to ET}\\\textbf{(Eval / Train)}} &
+% \textbf{Rel. Size to ET} \\
+% \midrule
+% ET   & 1.0x / 1.0x  & 1.0x / 1.0x  & 1.0x  \\
+% CT  & 1.25x / 1.15x & 0.92x / 0.93x & 1.4x  \\
+% GET (Frad/SliDe) & 1.67x / 1.38x & 0.25x / 0.19x & 2.0x  \\
+% CGT & 1.90x / 1.53x & 0.25x / 0.18x & 2.45x \\
+% \bottomrule
+% \end{tabular}
+% \end{adjustbox}
+% \end{subtable}
+% \vspace{0.25em}
+% \end{table}
+
+\input{arch_speed_mem}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.6\linewidth]{arch_both_res.png}
+  \caption{\textbf{Adaptive layer normalization for SCD:} On the left we illustrate a simplified diagram of the original residual layer block in TorchMD-Net (ET). Here, 'X' represents invariant (L0) embeddings while 'V' represents equivariant vector embeddings (L1), and 'C' represents the conditioning embedding. On the right, we show how we modify the original residual block with a conditional scale, shift, and gate of the invariant embeddings. In the gate block the gamma vector is attenuated by a tanh function and multiplied to the output of the ET Attention block. For this work, we use a two layer MLP for conditioning in each layer.}
+  \label{fig:adanorm}
+\end{figure}
+
+
+\begin{table}[t]
+\centering
+\caption{Backbone architecture hyperparameters used in this work. CT-small is only used in the MD17 benchmark}
+\label{tab:backbone_hparams}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Hyperparameter} & \textbf{CT} & \textbf{CGT} & \textbf{CT-small} \\
+\midrule
+Layers                & 8   & 8   & 6   \\
+Attention heads       & 8   & 8   & 8   \\
+Embedding dimension   & 256 & 256 & 128 \\
+Layer pooling         & sum & sum & sum \\
+Graph cutoff (\AA)    & 5   & 5   & 5   \\
+L0 head pooling       & sum & sum & sum \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% \FloatBarrier % ############################
+
+\section{Supplementary Results}
+
+\input{umap_fig}
+
+
+\subsection{Ligand Binding Affinity}
+\subsubsection{Conditional Denoising of Coupled Components: Pockets and Ligands}
+\label{PairConditionalDenoising}
+When dataset samples ($\mathbf{x}$) contain interdependent pairs ($\mathbf{x}=A\cup B$), such as a protein pocket and a bound ligand, we can alter the self-conditioned denoising objective to instead denoise one component based on an embedding from the other (eqn \ref{component_conditional_denoising}). In doing so we can exploit known conditional relationships in the dataset during pretraining.
+
+\begin{equation}\label{component_conditional_denoising}
+\begin{aligned}
+&\mathbb{E}_{q_{\sigma}(\tilde{\mathbf{x}}, \mathbf{x})}
+\left[
+  \left\lVert
+    \phi_{\theta}(\tilde{\mathbf{x}}|\mathbf{c}) - \varepsilon
+  \right\rVert_{2}^{2}
+\right]
+= \mathbb{E}_{q_{\sigma}(\tilde{\mathbf{A}}, \mathbf{B})}
+\left[
+  \left\lVert
+    \phi_{\theta}(\tilde{\mathbf{A}}|\phi_{\theta}(\mathbf{B})_{L0})_{L1} - \varepsilon_A
+  \right\rVert_{2}^{2}
+\right]\\
+% &\text{where } \mathbf{x} = \{\mathbf{A}, \mathbf{B}\} \\
+\end{aligned}
+\end{equation}
+
+
+In table \ref{tab:lba_full} we present results from three variations of pretraining on SAIR. In CT-SCD-SAIR, we pretrain the model using canonical SCD, embedding and denoising the entire pocket-ligand complexes together. However, in pretraining CT-SCD-SAIR-Lig the ligand structure is embedded and used to conditionally denoise the pocket atoms; and in CT-SCD-SAIR-Pocket we do the reverse, pocket atoms are embedded and used to conditionally denoise the ligand atoms. In doing this we find that CT-SCD-SAIR-Pocket performs the best (specifically on low sequence overlap), CT-SCD-SAIR the second best, and CT-SCD-SAIR-Lig the worst. This follows biochemical intuition, as we'd expect ligand conformation to be strongly dependent on pocket geometry, but not the other way around. We hold this as an example of how exploiting known conditional relationships can benefit learned representation during pretraining. We suspect that component conditional de-corrupt objectives may also benefit other pairwise tasks.
+% ### larger results table
+\input{lba_full}
+
+% \subsection{Matbench Properties: bandgap}
+\input{mpgap_full}
+
+\subsection{Force-Energy Pretraining and Fine-Tuning For Property Prediction}
+
+In this work, we conduct all force-energy pretraining using the OMol25-4M dataset and a CT backbone. In Table \ref{tab:fe_pretrain}, we compare models pretrained via either direct ('forward') or gradient-based ('backward' aka 'conservative') force prediction. Unsurprisingly, the simple CT backbone does not yield state-of-the-art force-energy predictions; however, we find that SCD pretraining confers a modest benefit even when restricted to the same training geometries as the labeled task. Additionally, we find that a single SCD step (comprising a double forward pass) is roughly half the speed of a direct force training step (a single forward pass), but $1.4\times$ faster than a gradient-based (forward then 'backwards') force training update step. Table \ref{tab:fe_finetune} presents benchmarking results for these models on two representative QM9 tasks: HOMO and $U_0$ (potential energy at 0K). We observe that pretraining via direct force prediction benefits downstream property prediction more than gradient-based force pretraining, but it does not outperform SCD pretraining. In other tables, we report to our best model—pretrained exclusively on direct force prediction—as 'CT-FE-OMOL25'.
+
+\input{FE_pretrain}
+
+
+% \subsection{QM9 results from other SSL studies using different architectures and pretraining datasets}
+\input{scd_vs_SSL_qm9}
+
+\subsection{MD17: Small Molecule Forces}
+
+Consistent with prior work, we benchmark a smaller SCD model (6 layers, dim 128) on MD17 \cite{md17_chmiela2017machine}. The models presented in Table \ref{tab:md17_scd} were pre-trained on the PCQ dataset and subsequently fine-tuned on MD17. To match the fine-tuning methods described by Frad \cite{Frad_Ni2024}, we also train a model using a two pass 'force-denoise' scheme, in which the first pass is used to predict forces and energies and the second forward pass is used for a auxiliary denoising task. We observe that SCD pre-training with the CT backbone yielded results similar to those of Frad and SLiDe, while achieving 4x faster inference speeds. However, none of these methods achieve particularly strong performance on this benchmark. We hypothesize that this stems from the pre-training dataset containing exclusively ground-state geometries; consequently, the non-equilibrium structures in MD17 are likely out-of-distribution. Lacking non-equilibrium structures during pre-training, the models fail to capture features necessary for non-equilibrium prediction tasks. This aligns with our findings on other benchmarks, where similarity between pre-training and fine-tuning data distributions is a strong predictor of performance. We do not report results for the GET/CGT variant due to persistent numerical instability (segmentation faults) when computing gradient-based forces.
+
+% Regardless, GET is significantly slower than ET and CT, making it poorly suited to downstream force/energy prediction applications.]
+\input{md17_scd}
+
+
+\section{Datasets}
+\label{appendix_datasets}
+
+\subsection{Pretraining Datasets}
+% We've made all pretraining datasets available for download on huggingface here: (add link) 
+
+\textbf{PCQ}: The PCQM4Mv2 dataset is a curated subsample of the PubChemQC project containing ground state geometries for 3.378M organic small molecule obtained using B3LYP/6-31G* DFT \cite{PubChemQC_Nakata2017}. This dataset is commonly used for demonstrating self-supervised learning methods, either on its own or as part of a composite dataset. Throughout this work we use 'PCQ' to indicate models trained only on this dataset. 
+
+% We've uploaded a copy of this preprocessed dataset to huggingface here: (add link)
+
+\textbf{GEOM10}: The original GEOM dataset contains 36M conformers from $\sim$450k unique molecules generated using GFN2-xTB, a semi-empirical extended tight-binding method \cite{GEOM_axelrod2022}. GEOM is split into three categories: 1) GEOM-drugs, containing conformers of drug like small molecules, 2) GEOM-QM9, conformers of molecules from the qm9 dataset, and 3) GEOM-MoleculNet, containing conformers from a subsample of molecules in the MoleculeNet benchmark. To avoid overlap with benchmarking datasets we only utilize structures from geom-drug, containing 304k unique molecules, and curate two subsamples: GEOM10, containing up to 10 of the lowest energy conformers from each molecule (2.7M geometries total), and GEOM1 containing only the lowest energy (ground-state) conformer from each molecule (304k geometries). 
+% We've made our versions of GEOM available on huggingface here: (add link)
+
+\textbf{SAIR}: The Structurally Augmented IC50 Repository (SAIR) dataset contains a large number of bound protein-ligand structures generated using the Boltz-1x model \cite{boltz1_2024}. Five conformers are provided for each structure. Although, the authors of the SAIR reports to have 1,048,857 unique binding pairs totaling in 5.2M conformers, the copy we obtained from huggingface (https://huggingface.co/datasets/SandboxAQ/SAIR) contains only 888,104 unique binding pairs and 4.4M conformers. 
+
+\textbf{Alex-MP-20}: The Alex-MP-20 dataset comprises 607,673 periodic materials structures with up to 20 atoms \cite{mattergen_zeni2023} derived from both the Materials Project \cite{MaterialsProject}, and the Alexandria materials database \cite{Alexandria_1, Alexandria_2}. Throughout this work, we refer to Alex-MP-20 as 'AMP20'. When SCD pretraining on AMP20, we apply a unit cell repeat augmentation to simulate larger crystals. Each sample is randomly tiled in one direction with a probability ($p_{\text{cell repeat}}$) of 50\%, for up to two repeats. This dataset is also available on huggingface (https://huggingface.co/datasets/OMatG/Alex-MP-20).
+
+\textbf{AllAtoms (ALL):} We also pretrain on a combine dataset that includes the entirety of PCQ, GEOM10, SAIR, and AlexMP20, totaling in 5.2M unique structures with 11.3M conformations. 
+
+
+\textbf{OMol25 4M split}: The Open Molecular Dataset 2025 (OMol25) is a large-scale repository of over 100 million quantum chemistry calculations covering 83 million unique molecular systems \cite{OMOL25_levine2025open}. While the full dataset spans the first 83 elements (H--Bi) and systems up to 350 atoms, we utilize the designated `4M split', a randomly sampled subset of approximately 4 million geometries. All labels (forces and energies) were computed at the $\omega$B97M-V/def2-TZVPD level of theory. The 4M subset preserves the broad chemical diversity of the full dataset, containing equilibrium and non-equilibrium structures from four primary domains: small organic molecules, biomolecules (proteins, DNA/RNA from PDB/BioLiP2), metal complexes (transition metals, ligands), and electrolytes. This dataset is available on huggingface (https://huggingface.co/facebook/OMol25).
+
+
+\subsection{Benchmarking Datasets and Finetuning Hyperparameters}
+
+\textbf{QM9}: The QM9 dataset is a commonly used benchmark for small molecule property prediction on 3D geometries\cite{QM9_Ramakrishnan2014}. QM9 comprises a set of small organic molecules containing up to nine heavy atoms (C,N,F,O), or up to 29 atoms total when including hydrogen. All 3D Geometries from QM9 are computed using the B3LYP/6-31G(2df, p) DFT functional and are labeled with a set of 15 quantum mechanical properties including homo-lumo gap, atomization energies, specific heat, polarizability and more. The original dataset contains 134k molecules, however it is now standard practice to use a cleaned version containing 130,831. We obtain our copy from the PyTorch Geometric library. QM9 is typically split randomly: 110,000 for training, 10,000 for validation, and the remaining 10,831 for the test set. We use this convention in our work, however we do not use the validation set for early stopping. We follow the practices described in TorchNet-MD\cite{TorchMD-Net_thölke2022} and subtract provided references energies from atomization energy targets. All other targets are normalized to a standard gaussian for prediction.
+
+
+\textbf{LBA}: The Ligand Binding Affinity (LBA) dataset comprises 4,463  co-crystallized 3D structures of  protein-ligand complexes derived from PDBbind. Binding affinities targets are experimentally derived and provided as negative log of either inhibition or dissociation constant ($-log(K)$). Two splits are provided based on sequence overlap between proteins in the training set and test set; in ‘id60’ no protein in the training set has more than a 60\% sequence overlap with any protein in the testset. Similarly, in ‘id30’ train-test sequence overlap is limited to 30\%. Following ATOM3D preprocessing\cite{LBA_dataset}, predictions are made using extracted pocket-ligand complexes.
+
+
+\textbf{Matbench}: The matbench properties dataset \cite{matbench_2020} provides 13 different tasks (regression and classification) for periodic materials structures to benchmark property prediction models. Across these tasks, training set size ranges from 312-132k samples, each of which are split into 5 folds with predefined test splits. In this work we explore only one regression task, 'mp\_gap' or bandgap energy prediction, as a proof of concept. We choose bandgap energy because of its economic relevance. The ‘mp\_gap’ task provides 106k periodic crystal structures in total, resulting in training set sizes of 84k and test set sizes of 21k. We report results for split 0 with all models tested. For our best model we also report the average of all splits.
+
+\textbf{MD17}: The MD17 \cite{md17_chmiela2017machine} dataset comprises a collection of ab initio molecular dynamics (AIMD) trajectories for eight small organic molecules with DFT forces and energies, commonly used to evaluate MLIPs. Following past convention we use a random split of 950 samples for training, 50 for validation (however we do not employ early stopping), and the remainder as the test set. The total number of geometries provided for each trajectory varies from 150k-1M. All force predictions provided are derived from energy gradients (a backwards pass).
+
+
+
+\section{Hyperparameters}
+
+\include{Hyperparameters}

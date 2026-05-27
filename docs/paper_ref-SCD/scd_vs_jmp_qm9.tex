@@ -1,0 +1,35 @@
+\begin{table*}[t]
+\centering
+\caption{\textbf{Comparing Computational Costs and Performance}. SCD pretraining enables competitive performance at a lower cost than more advanced Clebsch-Gordan tensor product based architectures, and large-scale force-energy (FE) pretrained models. \textbf{Bold} denotes best; \underline{underline} denotes second best.
+% Notably, our models achieve performance comparable to large-scale JMP variants while using orders of magnitude fewer pretraining structures and GPU-hours. 
+}
+\label{tab:scd_vs_jmp_qm9}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l r r r r r r}
+\toprule
+\textbf{Metric} & \textbf{EquiformerV2} & \textbf{Baseline (ET)} & \textbf{CT-SCD} & \textbf{CGT-SCD} & \textbf{JMP-S} & \textbf{JMP-L} \\
+% & \cite{EquiformerV2_Liao2023} & \cite{TorchMD-Net_thölke2022} & \textbf{(Ours)} & \textbf{(Ours)} & \cite{JMP_Shoghi2023} & \cite{JMP_Shoghi2023} \\
+\midrule
+Model Parameters & 11.2M & 7M & 10M & 17M & 27M & 235M \\
+Pretraining Structures & 0 & 0 & 3.4M (U) & 3.4M (U) & 120M (L) & 120M (L) \\
+Pretraining GPU-hours & 0 & 0 & \textbf{298} & \underline{1,308} & 5,700 & 34,400 \\
+Finetuning GPU-h/task & 137 & --- & \textbf{46} & \underline{96} & --- & --- \\
+Total hours (10 tasks) & \underline{1,370} & --- & \textbf{758} & 2,268 & $>5,700$ & $>34,400$ \\
+\midrule
+\textbf{QM9 Task (MAE)} & & & & & & \\
+\midrule
+HOMO (meV) & 14.0 & 20.3 & 12.7 & \underline{9.65} & 11.1 & \textbf{8.8} \\
+LUMO (meV) & 13.0 & 17.5 & 11.5 & \underline{9.05} & 10.8 & \textbf{8.6} \\
+Gap (meV) & 29.0 & 36.1 & 24.5 & \underline{19.7} & 23.1 & \textbf{19.1} \\
+ZPVE (meV) & 1.47 & 1.84 & 1.18 & 1.22 & \underline{1.0} & \textbf{0.9} \\
+$\alpha$ ($a_0^3$) & 0.050 & 0.059 & 0.0377 & 0.0383 & \underline{0.037} & \textbf{0.032} \\
+$C_v$ (cal/mol K) & 0.023 & 0.026 & 0.021 & 0.019 & \underline{0.018} & \textbf{0.017} \\
+$U_0$ (meV) & 6.17 & 6.15 & 3.58 & 3.96 & \underline{3.3} & \textbf{2.9} \\
+$U$ (meV) & 6.49 & 6.38 & 3.50 & 4.11 & \underline{3.3} & \textbf{2.8} \\
+$H$ (meV) & 6.22 & 6.16 & 3.52 & 4.00 & \underline{3.3} & \textbf{2.8} \\
+$G$ (meV) & 7.57 & 7.62 & 5.29 & 5.29 & \underline{4.5} & \textbf{4.3} \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\flushleft\footnotesize (U) denotes unlabeled geometries; (L) denotes labeled force-energy structures.
+\end{table*}

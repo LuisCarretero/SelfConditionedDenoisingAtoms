@@ -1,0 +1,30 @@
+
+\begin{table}[h]
+\centering
+\caption{SCD vs. other SSL Methods using different backbones and pretraining data. Models CT and CGT below are both pretrained on the PCQ dataset. Best results are \textbf{bolded}; second best are \underline{underlined}.}
+\label{tab:scd_vs_SSL_qm9}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l c c c c}
+\toprule
+\textbf{QM9 Task} & \textbf{CT} & \textbf{CGT} & \textbf{EPT-10} & \textbf{Uni-Corn} \\
+ & (Ours) & (Ours) & \cite{EPT_jiao2025} & \cite{UniCorn_Feng2024} \\
+\midrule
+Params & 10M & 17M & 30M & --- \\
+Pretrain Data & 3.4M & 3.4M & 5.9M & 15M \\
+\midrule
+HOMO (meV) & \underline{12.7} & \textbf{9.65} & 15.2 & 13.0 \\
+LUMO (meV) & \underline{11.5} & \textbf{9.05} & 13.6 & 11.9 \\
+Gap (meV) & \underline{24.5} & \textbf{19.7} & 29.0 & 24.9 \\
+ZPVE (meV) & \underline{1.18} & 1.22 & \textbf{1.11} & 1.4 \\
+$U_0$ (meV) & \textbf{3.58} & \underline{3.96} & 5.44 & 3.99 \\
+$U$ (meV) & \textbf{3.50} & 4.11 & 5.54 & \underline{3.95} \\
+$H$ (meV) & \textbf{3.52} & 4.00 & 5.42 & \underline{3.94} \\
+$G$ (meV) & \underline{5.29} & \underline{5.29} & 6.37 & \textbf{5.09} \\
+$\alpha$ ($a_0^3$) & \underline{0.0377} & 0.0383 & 0.045 & \textbf{0.036} \\
+$C_v$ (cal/mol K) & 0.021 & \textbf{0.019} & 0.020 & \textbf{0.019} \\
+\bottomrule
+\end{tabular}
+\vspace{0.25em}
+\flushleft\footnotesize The pretraining datasets for EPT-10 and Uni-Corn include the 3.4M PCQ structures used by SCD.
+\end{table}

@@ -1,0 +1,439 @@
+%%%%%%%% ICML 2026 EXAMPLE LATEX SUBMISSION FILE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2026} with \usepackage[nohyperref]{icml2026} above.
+\usepackage{hyperref}
+
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2026}
+
+% For preprint, use
+\usepackage[preprint]{icml2026}
+
+% If accepted, instead use the following line for the camera-ready submission:
+% \usepackage[accepted]{icml2026}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+
+% #### custom
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\usepackage{tabularx}
+
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{Self-Conditioned Denoising for Atomistic Representation Learning}
+
+\begin{document}
+
+\twocolumn[
+  \icmltitle{Self-Conditioned Denoising for Atomistic Representation Learning}
+
+  % It is OKAY to include author information, even for blind submissions: the
+  % style file will automatically remove it for you unless you've provided
+  % the [accepted] option to the icml2026 package.
+
+  % List of affiliations: The first argument should be a (short) identifier you
+  % will use later to specify author affiliations Academic affiliations
+  % should list Department, University, City, Region, Country Industry
+  % affiliations should list Company, City, Region, Country
+
+  % You can specify symbols, otherwise they are numbered in order. Ideally, you
+  % should not use this facility. Affiliations will be numbered in order of
+  % appearance and this is the preferred way.
+  \icmlsetsymbol{equal}{*}
+
+  \begin{icmlauthorlist}
+    \icmlauthor{Tynan J. Perez}{yyy}
+    \icmlauthor{Rafael Gómez-Bombarelli}{xxx}
+    % \icmlauthor{Firstname3 Lastname3}{comp}
+    % \icmlauthor{Firstname4 Lastname4}{sch}
+    % \icmlauthor{Firstname5 Lastname5}{yyy}
+    % \icmlauthor{Firstname6 Lastname6}{sch,yyy,comp}
+    % \icmlauthor{Firstname7 Lastname7}{comp}
+    % %\icmlauthor{}{sch}
+    % \icmlauthor{Firstname8 Lastname8}{sch}
+    % \icmlauthor{Firstname8 Lastname8}{yyy,comp}
+    % %\icmlauthor{}{sch}
+    % %\icmlauthor{}{sch}
+  \end{icmlauthorlist}
+
+  \icmlaffiliation{yyy}{Department of Chemistry, Massachusetts
+Institute of Technology, 77 Massachusetts Avenue, Cambridge, 02139,
+MA, USA}
+  \icmlaffiliation{xxx}{Department of Materials Science and Engineering, Massachusetts
+Institute of Technology, 77 Massachusetts Avenue, Cambridge, 02139,
+MA, USA}
+  % \icmlaffiliation{comp}{Company Name, Location, Country}
+  % \icmlaffiliation{sch}{School of ZZZ, Institute of WWW, Location, Country}
+
+  \icmlcorrespondingauthor{Rafael Gómez-Bombarelli}{rafagb@mit.edu}
+
+  % You may provide any keywords that you find helpful for describing your
+  % paper; these are used to populate the "keywords" metadata in the PDF but
+  % will not be shown in the document
+  \icmlkeywords{Machine Learning, ICML}
+
+  \vskip 0.3in
+]
+
+% this must go after the closing bracket ] following \twocolumn[ ...
+
+% This command actually creates the footnote in the first column listing the
+% affiliations and the copyright notice. The command takes one argument, which
+% is text to display at the start of the footnote. The \icmlEqualContribution
+% command is standard text for equal contribution. Remove it (just {}) if you
+% do not need this facility.
+
+% Use ONE of the following lines. DO NOT remove the command.
+% If you have no special notice, KEEP empty braces:
+
+\printAffiliationsAndNotice{}  % no special notice (required even if empty)
+
+% Or, if applicable, use the standard equal contribution text:
+% \printAffiliationsAndNotice{\icmlEqualContribution}
+
+\begin{abstract}
+  % This document provides a basic paper template and submission guidelines.
+  % Abstracts must be a single paragraph, ideally between 4--6 sentences long.
+  % Gross violations will trigger corrections at the camera-ready phase.
+  
+
+The success of large-scale pretraining in NLP and computer vision has catalyzed growing efforts to develop analogous foundation models for the physical sciences. However,  pretraining strategies using atomistic data remain underexplored. To date, large-scale supervised pretraining on DFT force-energy labels has provided the strongest performance gains to downstream property prediction, out-performing existing methods of self-supervised learning (SSL) which remain limited to ground-state geometries, and/or single domains of atomistic data. We address these shortcomings with Self-Conditioned Denoising (SCD), a backbone-agnostic reconstruction objective that utilizes self-embeddings for conditional denoising across any domain of atomistic data, including small molecules, proteins, periodic materials, and 'non-equilibrium' geometries. When controlled for backbone architecture and pretraining dataset, SCD significantly outperforms previous SSL methods on downstream benchmarks and matches or exceeds the performance of supervised force-energy pretraining. We show that a small, fast GNN pretrained by SCD can achieve competitive or superior performance to larger models pretrained on significantly larger labeled or unlabeled datasets, across tasks in multiple domains. Our code is available at: \url{https://github.com/TyJPerez/SelfConditionedDenoisingAtoms}
+
+\end{abstract}
+
+\section{Introduction}
+\input{intro}
+
+\section{Background}
+\subsection{Contrastive Learning on Low Dimensional Representation}
+Early atomistic SSL relied on maximizing mutual information between 3D geometries and lower-dimensional representations, such as 2D graphs or SMILES \cite{GraphMVP_liu2022, 3dinfomax_stärk2022, attrmasking_hu2020}. While these methods improved performance for predictions on lower dimensional inputs, they often underperformed supervised models acting on 3D inputs, and were not applicable in configurationally aware tasks like force prediction or ligand docking. Furthermore, multi-modal contrastive approaches are inapplicable to systems lacking 1D representations, such as periodic crystals, limiting their generality.
+
+\subsection{Node Denoising}
+Node denoising pretraining emerged as a more generalizable alternative, operating directly on 3D point clouds. Formally, given an input structure with N atoms $\mathbf{x} \in \mathbb{R}^{N\times3}$, we sample Gaussian noise $\boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma^{2}\mathbf{I})$ to generate a corrupted geometry $\tilde{\mathbf{x}} = \mathbf{x} + \boldsymbol{\varepsilon}$. A neural network $\phi_{\theta}$ is then trained to predict the noise vector on each atom of the corrupted geometry:
+\begin{equation}
+\label{eq:denoising}
+\mathcal{L}_{\text{denoise}} = \mathbb{E}_{\mathbf{x}, \boldsymbol{\varepsilon}} \left[ \left\lVert \phi_{\theta}(\tilde{\mathbf{x}}) - \boldsymbol{\varepsilon} \right\rVert_{2}^{2} \right]
+\end{equation}
+Unlike contrastive objectives that promote multi-view invariance, noise prediction encourages equivariance to geometric perturbations, making it effective for learning geometric features of local atomic environments. Pretraining by node denoising  has proven useful as both an auxiliary loss \cite{NoisyNodes_Godwin2022, Equiformer1_Liao2022, EquiformerV2_Liao2023} and a standalone pretraining task \cite{NoisyNodes_Zaidi2023PVD, SE3invDenoise_liu2023, Atomica_Fang2025, EPT_jiao2025}.
+
+% \subsection{Variations on Node Denoising}
+\subsection{State of The Art Pretraining}
+Despite its elegance and generality, standard node denoising struggles to match the efficacy of supervised force-energy (FE) pretraining, largely because it fails to benefit from training on non-ground state ('non-equilibrium') geometries \cite{ETOREO_feng2023}. Early interpretations suggested that denoising approximates learning a 'near-equilibrium' force field \cite{NoisyNodes_Zaidi2023PVD}. However, for high-energy configurations, noise vectors $\boldsymbol{\varepsilon}$ (the vectors pointing from corrupted atom positions to uncorrupted positions) are unlikely to resemble true forces and the difference between a corrupted input and a valid non-corrupted higher-energy configuration becomes ambiguous. This makes denoising 'non-equilibrium' geometries an ill-posed task without additional information. One solution is to incorporate a force encoding \cite{DeNS_liao2024}, but this is no longer SSL as it requires force-energy labels.  
+
+Others have shown that there is little correlation between noise vectors and true DFT forces even for ground-state geometries \cite{SliDe_Ni2025}.  Variations on the node denoising objective have improved performance, but at the cost of introducing domain-specific constraints, such as torsional noise in \textit{Frad} \cite{Frad_Ni2024}, or pseudo-force targets in \textit{SliDe} \cite{SliDe_Ni2025}. Others have explored specialized masking, block-wise denoising,  hybrid contrastive objectives with lower-dimensional representations, and scaling pretraining on larger datasets with to up to 200M geometries \cite{Atomica_Fang2025,UniCorn_Feng2024,EPT_jiao2025, UniMol_Zhou2023}. However, these approaches often sacrifice generality and remain limited to ground state geometries of small molecules. To date, general-purpose SSL objectives have not matched the performance of supervised FE pretraining on downstream property prediction tasks \cite{JMP_Shoghi2023, HackNIP_kim2025}.
+
+
+
+\section{Method}
+\subsection{The Limitations of Node Denoising}
+
+We identify three critical limitations of standard node denoising as a pretraining objective:
+
+\begin{description}
+\item[\textbf{(s1) Locality of Node Denoising:}] 
+GNNs often struggle with global representations and long-range correlations. Node denoising fails to produce strong global semantic learning because: (1) Gaussian noise applied to atom positions lacks long-range correlation across space, and (2) small perturbations in atom position can be estimated with high accuracy using a relatively small, local context window.
+
+\item[\textbf{(s2) Scalar vs. Vector Embedding Pressure:}] 
+ Equivariant GNNs commonly partition node embeddings into multiple channels determined by rotational symmetry groups ($L=0, 1, 2, \dots$). Because noise prediction is an equivariant vector ($L=1$) objective, it primarily impacts $L=1$ channels. While denoising gradients propagate through all model parameters, there is insufficient pressure on invariant scalar embeddings ($L=0$) to develop good semantic representations. This is problematic for downstream property predictions, which are often roto-translation invariant and rely on the invariant ($L=0$) channel.
+
+\item[\textbf{(s3) Ambiguity with Non-Equilibrium Structures:}] 
+Standard node denoising pretraining does not benefit from including 'non-equilibrium' or high-energy geometries. Without additional context,  models cannot distinguish between a corrupted input geometry and a valid, high-energy target geometry. This creates ambiguity in the objective when training on datasets that include non-ground-state conformers.
+\end{description}
+
+\subsection{Self-Conditioned Denoising}
+Self-Conditioned Denoising (SCD) addresses all three shortcomings of the standard denoising objective by incorporating a conditional embedding in the model architecture as shown in eqn. \ref{scd_obj1}:
+\begin{equation}\label{scd_obj1}
+\mathbb{E}_{q_{\sigma}(\tilde{\mathbf{x}}, \mathbf{x})}
+\left[
+  \left\lVert
+    \phi_{\theta}(\tilde{\mathbf{x}}|\mathbf{c}) - \varepsilon
+  \right\rVert_{2}^{2}
+\right], \quad
+\mathbf{c} = f_{\eta}(\mathbf{x})
+\end{equation}
+Here, $c \in  \mathbb{R}^{d}$ is an embedding vector that represents the uncorrupted target geometry. This conditioning provides the model with enough information to distinguish between corrupted samples and a valid target conformation (addressing s3). The conditional embedding itself can then be used as a training objective to develop meaningful invariant (L0) representation (addressing s2). This in turn pushes the embedding model ($f_{\eta}$) to develop better global/semantic representation (addressing s1). In SCD, we use the same model as both the embedding model $f_{\eta}$, and the noise predictor, $\phi_{\theta}$, during each optimizer step of pretraining (shown in eqn \ref{SCD_obj2}).
+\begin{equation}\label{SCD_obj2}
+\begin{aligned}
+\mathbb{E}_{q_{\sigma}(\tilde{\mathbf{x}}, \mathbf{x})}
+\left[
+  \left\lVert
+    \phi_{\theta}(\tilde{\mathbf{x}}|\mathbf{c}) - \varepsilon
+  \right\rVert_{2}^{2}
+\right]\\[1ex]
+=
+\mathbb{E}_{q_{\sigma}(\tilde{\mathbf{x}}, \mathbf{x})}
+\left[
+  \left\lVert
+    \phi_{\theta}(\tilde{\mathbf{x}}|\phi_{\theta}(\mathbf{x})_{L0})_{L1} - \varepsilon
+  \right\rVert_{2}^{2}
+\right]\\[2ex]
+\mathbf{c} = \phi_{\theta}(\mathbf{x})_{L0} \in \mathbb{R}^d, \quad
+\phi_{\theta}(\tilde{\mathbf{x}}|\mathbf{c})_{L1} \in \mathbb{R}^{N\times3}\\
+\end{aligned}
+\end{equation}
+Implementation of the SCD objective is summarized by algorithm \ref{alg:pretrain_finetune} and visualized in figure \ref{fig:scd}. First a forward pass is made using uncorrupted geometries ($\mathbf{x}$). The resulting invariant (L0) embeddings are sum-pooled across nodes and passed through a two-layer MLP embedding head, forming a single embedding per geometry. This creates an information bottleneck that encourages semantic representation. The embedding is then used as conditional guidance for a second forward pass during which a corrupted geometry ($\tilde{\mathbf{x}}$) is used as input. The L1 equivariant output from the second pass is then used to predict the per-node noise corruption. To preserve unconditional behavior, we drop 20\% of conditional embeddings each pass. After pretraining is complete, downstream supervised finetuning and inference only requires a single model pass without conditioning. 
+
+
+% ########## DOUBLE COLUMN VERSION ######
+% \begin{algorithm*}[t]
+% \small
+% \caption{Pretraining and Fine-tuning Pipeline}
+% \label{alg:pretrain_finetune}
+% \begin{algorithmic}[1]
+% \REQUIRE Dataset $\mathcal{D}$, noise scales $\sigma_{\text{corr}}, \sigma_{\text{reg}}$, model $\phi_{\theta}$
+% \ENSURE Trained parameters $\theta$
+
+% \vspace{0.5em}
+% \STATE \textbf{Pretraining}
+% \FOR{each minibatch $\mathbf{x} \sim \mathcal{D}$}
+%     \STATE $(\mathbf{x}, \tilde{\mathbf{x}}, \varepsilon) \leftarrow \textsc{Corrupt}(\mathbf{x}, \sigma_{\text{corr}}, \sigma_{\text{reg}})$ \hfill $\triangleright$ clean and corrupted views
+%     \STATE $(\mathbf{c}_{L0}, \mathbf{v}_{L1}, \mathbf{y}_{L0}) \leftarrow \phi_{\theta}(\mathbf{x})$
+%     \STATE $(\tilde{\mathbf{c}}_{L0}, \tilde{\mathbf{v}}_{L1}, \tilde{\mathbf{y}}_{L0}) \leftarrow \phi_{\theta}(\tilde{\mathbf{x}}, \mathbf{c}_{L0})$
+%     \STATE $\mathcal{L}_{\text{pre}} \leftarrow \mathrm{MSE}(\tilde{\mathbf{v}}_{L1}, \varepsilon)$
+%     \STATE $\theta \leftarrow \theta - \eta \nabla_{\theta} \mathcal{L}_{\text{pre}}$
+% \ENDFOR
+
+% \vspace{0.5em}
+% \STATE \textbf{Fine-tuning / Inference}
+% \FOR{each labeled sample $(\mathbf{x}, \mathbf{y})$}
+%     \STATE $(\mathbf{c}_{L0}, \mathbf{v}_{L1}, \mathbf{y}_{L0}) \leftarrow \phi_{\theta}(\mathbf{x})$
+%     \STATE $\mathcal{L}_{\text{fine}} \leftarrow \mathrm{loss}(\mathbf{y}_{L0}, \mathbf{y})$
+%     \STATE $\theta \leftarrow \theta - \eta \nabla_{\theta} \mathcal{L}_{\text{fine}}$
+% \ENDFOR
+% \end{algorithmic}
+% \end{algorithm*}
+
+% \begin{figure}[t]
+%   \centering
+%   \caption{Self-Conditioned Denoising Pretraining}
+%   \label{fig:scd}
+% \end{figure}
+
+
+
+% ########## SINGLE COLUMN VERSION ######
+\begin{algorithm}[t]
+\small
+% \setlength{\algorithmiclineskip}{2pt}
+\renewcommand{\baselinestretch}{1.3}\selectfont
+\caption{SCD Pretraining and Fine-tuning Pipeline}
+\label{alg:pretrain_finetune}
+\begin{algorithmic}[1]
+\REQUIRE Dataset $\mathcal{D}$, noise scales $\sigma_{\text{corr}}, \sigma_{\text{reg}}$, model $\phi_{\theta}$
+\ENSURE Trained parameters $\theta$
+
+\vspace{0.5em}
+\STATE \textbf{Pretraining}
+\FOR{each minibatch $\mathbf{x} \sim \mathcal{D}$}
+    \STATE $(\mathbf{x}, \tilde{\mathbf{x}}, \varepsilon) \leftarrow \textsc{Corrupt}(\mathbf{x}, \sigma_{\text{corr}}, \sigma_{\text{reg}})$ $\triangleright$ create views
+    \STATE $(\mathbf{c}_{L0}, \mathbf{v}_{L1}, \mathbf{y}_{L0}) \leftarrow \phi_{\theta}(\mathbf{x})$ $\triangleright$ self-embedding
+    \STATE $(\tilde{\mathbf{c}}_{L0}, \tilde{\mathbf{v}}_{L1}, \tilde{\mathbf{y}}_{L0}) \leftarrow \phi_{\theta}(\tilde{\mathbf{x}}, \mathbf{c}_{L0})$ $\triangleright$ conditional denoising
+    \STATE $\mathcal{L}_{\text{pre}} \leftarrow \mathrm{MSE}(\tilde{\mathbf{v}}_{L1}, \varepsilon)$
+    \STATE $\theta \leftarrow \theta - \eta \nabla_{\theta} \mathcal{L}_{\text{pre}}$
+\ENDFOR
+
+\vspace{0.5em}
+\STATE \textbf{Fine-tuning / Inference}
+\FOR{each labeled sample $(\mathbf{x}, \mathbf{y})$}
+    \STATE $(\mathbf{c}_{L0}, \mathbf{v}_{L1}, \mathbf{y}_{L0}) \leftarrow \phi_{\theta}(\mathbf{x})$
+    \STATE $\mathcal{L}_{\text{fine}} \leftarrow \mathrm{loss}(\mathbf{y}_{L0}, \mathbf{y})$
+    \STATE $\theta \leftarrow \theta - \eta \nabla_{\theta} \mathcal{L}_{\text{fine}}$
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+% #### DOUBLE COLUMN VERSION FIG #######
+\begin{figure*}[t]
+  \centering
+   \includegraphics[width=0.85\linewidth]{scd_method_fig.png}
+  \caption{Self-Conditioned Denoising Pretraining}
+  \label{fig:scd}
+\end{figure*}
+
+% #### SINGLE COLUMN VERSION FIG #######
+% \begin{figure}[t]
+%   \centering
+%   \caption{Self-Conditioned Denoising Pretraining}
+%   \label{fig:scd}
+% \end{figure}
+
+
+
+\subsection{Backbone Architectures}
+Following established baselines, we implement SCD using TorchMD-Net (also known as Equivariant Transformer or \textit{ET}) as the primary backbone \cite{TorchMD-Net_thölke2022, Frad_Ni2024, SliDe_Ni2025, UniCorn_Feng2024, NoisyNodes_Zaidi2023PVD}. To ensure a fair comparison, all models we train use an embedding dimension of 256, 8 layers, and 8 heads, consistent with previous SSL studies (see Table~\ref{tab:backbone_hparams}). 
+
+The ET backbone architecture is a lightweight, attention-based GNN that lacks both tensor products and angular embeddings that are now commonly found in equivariant MLIPs. However, other denoising variations like \textit{Frad} \cite{Frad_Ni2024} and \textit{SliDe} \cite{SliDe_Ni2025} require explicit angular information and utilize a modified ``Geometric Equivariant Transformer'' (GET). To achieve a direct comparison with these methods, we evaluate SCD on both the standard ET and the more expressive GET backbones.
+
+To incorporate conditional inputs into these non-conditional backbones, we replace existing pre-attention layer normalization with Adaptive Layer Normalization (\textit{AdaNorm}), analogous to its use in Diffusion Transformers \cite{DiT_peebles2023}. We find that AdaNorm has a negligible impact on inference speed or memory overhead. In contrast, the GET backbone is approximately $4\times$ slower and has twice as many parameters as the ET backbone. We denote the conditional versions of these two architectures as \textbf{CT} (Conditional TorchMD-Net) and \textbf{CGT} (Conditional Geometric TorchMD-Net), respectively. Additional implementation details and speed comparisons are provided in Appendix~\ref{Arch_and_implement_appendix}.
+
+\subsection{Datasets}
+Atomistic model training has often been siloed to single domains, typically focusing on small molecules, bio-molecules, or periodic materials independently. Although recent works have trained or pretrained on increasingly diverse datasets \cite{Atomica_Fang2025, ADIT_joshi2025, JMP_Shoghi2023}, multi-domain pretraining remains logistically challenging and under-explored. In this work, we evaluate models pretrained on a range of single domain datasets, with varying conformational diversity, as well as a combined multi-domain aggregate dataset (see Table~\ref{tab:dataset_summary}). All pretrained models are benchmarked on three representative tasks: 1) QM9 HOMO energy for small molecules \cite{QM9_Ramakrishnan2014}, 2) Matbench band gap for periodic materials \cite{matbench_2020}, and 3) Ligand Binding Affinity (LBA) for bio-molecules \cite{LBA_dataset}. Dataset descriptions are provided in Appendix~\ref{appendix_datasets}.
+
+\input{dataset_summary}
+
+\section{Results}
+\label{results}
+
+% \subsection{Comparing SCD with existing SSL methods}
+% \subsection{QM9: Small Molecule Property Prediction}
+\subsection{SCD Outperforms Other SSL Methods on Atomistic Data}
+Given the same pretraining dataset and backbone architecture, SCD pretraining significantly outperforms other forms of node denoising. When compared to standard node denoising pretraining (aka 'coord') we find that SCD conveys large improvements (19.6-45.5\%) across all QM9 targets tested, except heat capacity (Cv) (-5\%) (see table \ref{tab:scd_vs_coord}). In table \ref{tab:scd_vs_frad_slide} we compare SCD against SOTA methods Frad and Slide. We find that SCD pretraining, with either backbone architecture (CT or CGT) outperforms prior methods on most QM9 targets. Table \ref{tab:scd_vs_SSL_qm9} in the Appendix provides an additional comparison between our SCD pretrained models and other methods that used different backbone architectures and/or different pretraining datasets.
+
+\input{scd_vs_coord}
+\input{scd_vs_frad_slide}
+
+\subsection{SCD Benefits From Pretraining on Any Atomistic Data Source}
+% , particularly when applied to large, heterogeneous atomistic datasets
+% Utilizing all the available atomistic data for pretraining has remained a challenge for foundation model development.
+% Effective, low cost pretraining on large, diverse atomistic datasets that vary in quality or domain has been especially challenging for existing methods. 
+Making use of all available atomistic data during pretraining remains a notable bottleneck in scaling the atomistic foundation models. Prior SSL work has been limited to ground-state geometries of small molecules\cite{Frad_Ni2024,SliDe_Ni2025, UniCorn_Feng2024}, while force-energy pretraining across datasets from different DFT functionals often requires the use of dataset specific heads or other specialize architecture components \cite{JMP_Shoghi2023,UMA_wood2025}. In this work, we find that SCD pretraining derived a significant benefit from every dataset tested. In Table \ref{tab:scd_on_conformers} we show how datasets from different domains, and conformational diversity, impact QM9 homo energy prediction error. Here, we report that SCD pretraining benefits from including both multiple conformers (GEOM1 vs GEOM10), and non-equilibrium structures (i.e. OMol25). We also find that large datasets are not necessarily required to see a significant benefit from SCD pretraining. Pretraining on a random 10\% subset of PCQ (300k samples) provided only slightly lower performance than pretraining on the whole dataset (3.4M samples). Overall, we find that the most significant predictor of downstream prediction accuracy is the similarity between the pretraining dataset and the finetuning dataset.
+ 
+\input{scd_on_conformers}
+
+\subsection{Better Models Have Smoother Latent Spaces}
+Figure \ref{fig:umap_mini} provides UMAPs for QM9 molecule embeddings from both untrained and pretrained models, colored by the number of atoms in each sample (N). We observe that an untrained ET model has a strong bias towards highly clustered, extensive representations - mean pooled atom embeddings that are highly correlated with the number of atoms in each molecule. We find that standard node denoising ('coord') results in a smooth but highly extensive representation space (this was also observed by \cite{GeomRep_li2024}). We believe this is a consequence of features that are too biased towards local node geometry, rather than global semantic representation (non-extensive features). In models pretrained by SCD, we observe greater smoothing and a reduced correlation with N, suggesting a more semantic representation. Empirically, we find models with a smoother, less extensive, embedding space reach a lower prediction error on QM9 targets. Additional plots are provided in figure \ref{fig:umap}. 
+
+\input{umap_mini}
+
+\subsection{Comparing SCD Models with other Pretrained Models}
+In table \ref{tab:scd_vs_jmp_qm9}, we show that pretraining and finetuning a simple, fast GNN with SCD is more cost effective than supervised training from scratch with more advanced tensor-product based architectures like Equiformer\cite{EquiformerV2_Liao2023}, yet it provides downstream results that are comparable to larger models pretrained by supervised force-energy prediction using orders of magnitude more data \cite{JMP_Shoghi2023}. 
+
+SCD pretrained models also deliver strong results in property prediction for materials and proteins. In table \ref{tab:mpgap_brief} we show that our 10M parameter model pretrained on 675k periodic materials can achieve similar accuracy in bandgap prediction (within 2\%) as a 27M parameter model trained on 120M force-energy labeled geometries (108M of which are materials geometries). Table \ref{tab:lba_brief} presents a similar outcome for predictions of ligand binding affinity (LBA) on protein-ligand complexes. In this case, we can adjust the SCD objective to take advantage of an existing conditional relationship in the data: bound ligand conformation is determined by pocket geometry. We find that pretraining with 'pocket conditional ligand denoising' (CT-SCD-SAIR-Pocket) conveys an additional task specific benefit, and achieves state of the art results (See appendix section \ref{PairConditionalDenoising} for more details).
+ 
+In order to make a direct comparison between SCD and force-energy pretraining, we also benchmark a force-energy pretrained CT model using the 4M split of OMol25, and compare it with a CT model pretrained using SCD on the exact same geometries (without force-energy labels). We summarize these results in Table \ref{results_summary}, and show that SCD pretraining performs roughly as well (-1.1\%) or slightly better (+3.9\%) than force-energy pretraining across all three tasks. 
+
+% We summarize these results in Table \ref{results_summary}, and show that SCD pretrained models roughly match the [er] delivers similar performance to force-energy pretraining, outperforms 
+% as well or better than force-energy pretraining across all three tasks. 
+
+\input{scd_vs_jmp_qm9}
+\input{mpgap_brief}
+\input{lba_brief}
+\input{results_summary}
+
+
+\subsection{Conclusion}
+\input{conclusion}
+
+% #######  FOR PREPRINT ONLY
+% Acknowledgements should only appear in the accepted version.
+\section*{Acknowledgements}
+We thank Kaiming He and Bowen Deng for valuable feedback and helpful discussions on
+this work. This research used resources of the National Energy Research Scientific
+Computing Center (NERSC), a Department of Energy User Facility using NERSC award
+ALCC-ERCAP 0038200.
+
+% #######  FOR PREPRINT ONLY
+
+\section*{Impact Statement}
+This paper aims to advance applications of Machine Learning in the atomistic sciences. Specifically, we focus on improving the efficacy of self-supervised pretraining, potentially reducing the need for computationally expensive DFT labels. Any societal consequences or impacts that typically relate to the development of atomistic foundation models also apply here. Foundation models and their derivative tools could lower the cost of discovery in many areas of science, including dual use technologies. 
+
+% This paper presents work intended to advance 
+% whose goal is to advance the field of Machine
+% Learning. There are many potential societal consequences of our work, none
+% which we feel must be specifically highlighted here.
+
+% Authors are \textbf{required} to include a statement of the potential broader
+% impact of their work, including its ethical aspects and future societal
+% consequences. This statement should be in an unnumbered section at the end of
+% the paper (co-located with Acknowledgements -- the two may appear in either
+% order, but both must be before References), and does not count toward the paper
+% page limit. In many cases, where the ethical impacts and expected societal
+% implications are those that are well established when advancing the field of
+% Machine Learning, substantial discussion is not required, and a simple
+% statement such as the following will suffice:
+
+% ``This paper presents work whose goal is to advance the field of Machine
+% Learning. There are many potential societal consequences of our work, none
+% which we feel must be specifically highlighted here.''
+
+% The above statement can be used verbatim in such cases, but we encourage
+% authors to think about whether there is content which does warrant further
+% discussion, as this statement will be apparent if the paper is later flagged
+% for ethics review.
+
+\bibliography{example_paper}
+\bibliographystyle{icml2026}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% APPENDIX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newpage
+\appendix
+\onecolumn
+
+% \section{You \emph{can} have an appendix here.}
+% You can have as much text here as you want. The main body must be at most $8$
+% pages long. For the final version, one more page can be added. If you want, you
+% can use an appendix like this one.
+
+% The $\mathtt{\backslash onecolumn}$ command above can be kept in place if you
+% prefer a one-column appendix, or can be removed if you prefer a two-column
+% appendix.  Apart from this possible change, the style (font size, spacing,
+% margins, page numbering, etc.) should be kept the same as the main body.
+
+
+\input{Appendix}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
+
+% This document was modified from the file originally made available by
+% Pat Langley and Andrea Danyluk for ICML-2K. This version was created
+% by Iain Murray in 2018, and modified by Alexandre Bouchard in
+% 2019 and 2021 and by Csaba Szepesvari, Gang Niu and Sivan Sabato in 2022.
+% Modified again in 2023 and 2024 by Sivan Sabato and Jonathan Scarlett.
+% Previous contributors include Dan Roy, Lise Getoor and Tobias
+% Scheffer, which was slightly modified from the 2010 version by
+% Thorsten Joachims & Johannes Fuernkranz, slightly modified from the
+% 2009 version by Kiri Wagstaff and Sam Roweis's 2008 version, which is
+% slightly modified from Prasad Tadepalli's 2007 version which is a
+% lightly changed version of the previous year's version by Andrew
+% Moore, which was in turn edited from those of Kristian Kersting and
+% Codrina Lauth. Alex Smola contributed to the algorithmic style files.

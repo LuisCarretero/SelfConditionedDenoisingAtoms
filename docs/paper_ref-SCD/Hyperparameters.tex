@@ -1,0 +1,181 @@
+
+
+
+
+
+\subsection{Constants across all training runs}
+% \FloatBarrier
+
+All training runs discussed in this work use the AdamW optimizer with $\beta_2$=0.999, and a learning rate scheduler composed of a linear warm up, followed by cosine decay. No validation sets are used for early stopping, as is often done in other works. All graph creation uses a cutoff distance of 5.0 \AA.
+
+% \subsection{Pretraining}
+
+\begin{table}[t]
+\centering
+\caption{Base SCD pretraining hyperparameters: applied in all SCD training runs }
+\label{tab:pretrain_hparams}
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Warmup steps        & 10{,}000 \\
+Learning rate       & 0.005 \\
+$\beta_1$           & 0.9 \\
+Weight decay        & 0.05 \\
+DropPath            & 0.1 \\
+Corrupt noise $\sigma$ & 0.04 \\
+Regularization noise $\sigma$ & 0.005 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{SCD Pretraining: dataset and model specific hyperparameters.}
+\label{tab:scd_pretrain_hparams}
+% % \begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lccccccc}
+\toprule
+% \textbf{Name} &
+% \textbf{CT-SCD-PCQ} &
+% \textbf{CGT-SCD-PCQ} &
+% \textbf{CT-SCD-GEOM10} &
+% \textbf{CT-SCD-AMP20} &
+% \textbf{CT-SCD-SAIR} &
+% \textbf{CT-SCD-ALL} &
+% \textbf{CT-SCD-Omol25} \\
+\midrule
+Backbone            & CT  & CGT & CT & CT & CT & CT & CT \\
+Dataset             & PCQ & PCQ & GEOM10 & AMP20 & SAIR & ALL & Omol25 \\
+Total steps         & 800k & 800k & 800k & 800k & 800k & 1.2M & 800k \\
+Batch size / GPU    & 128 & 32 & 48 & 142 & 12 & 54 & 48 \\
+\# GPUs (A100)      & 4 & 16 & 16 & 4 & 8 & 16 & 16 \\
+Effective batch size& 512 & 512 & 768 & 568 & 96 & 864 & 768 \\
+\midrule
+\multicolumn{8}{l}{\textbf{Materials augmentations}} \\
+Cell repeat iters   & -- & -- & -- & 2 & -- & 2 & -- \\
+$p_{\text{cell repeat}}$ & -- & -- & -- & 0.5 & -- & 0.5 & -- \\
+\bottomrule
+\end{tabular}
+% \end{adjustbox}
+\end{table}
+
+% \FloatBarrier
+
+% \subsection{Finetuning}
+% \subsubsection{QM9}
+% For QM9 we use a common data split of 110,000 training samples
+
+% train 110000, val 10000, test 10831
+
+
+\begin{table}[t]
+\centering
+\caption{QM9 finetuning hyperparameters for different target groups.}
+\label{tab:qm9_finetune_hparams}
+% \begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Hyperparameter} &
+\textbf{HOMO, LUMO, Gap} &
+\textbf{U0, U, H, G} &
+\textbf{Alpha, ZPVE, CV} \\
+\midrule
+Batch size                 & 128   & 32    & 128   \\
+Learning rate              & 5e{-4} & 3e{-4} & 3e{-4} \\
+Total steps                & 300k  & 500k  & 400k  \\
+Warmup steps               & 10k   & 10k   & 10k   \\
+$\beta_1$                  & 0.995 & 0.995 & 0.95  \\
+Weight decay               & 0.01  & 0.01  & 0.01  \\
+DropPath (init / final)    & 0.15 / 0.1 & 0.15 / 0.0 & 0.15 / 0.01 \\
+Reg. noise $\sigma$        & 0.005 & 0.0 & 0.005 \\
+Denoise loss weight        & 0.1   & 0.0   & 0.2   \\
+Subtract ref. energy       & No    & Yes   & No    \\
+Loss EMA                   & Off   & 0.05  & Off   \\
+Head aggregation           & Sum   & Sum   & Sum   \\
+\bottomrule
+\end{tabular}
+% \end{adjustbox}
+\end{table}
+
+
+% \subsubsection{Matbench: materials project band gap}
+
+\begin{table}[t]
+\centering
+\caption{Matbench finetuning hyperparameters for the \texttt{mp\_gap} task.}
+\label{tab:matbench_mpgap_hparams}
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Batch size                 & 8 \\
+Learning rate (from scratch) & 2e{-4} \\
+Learning rate (finetuning)   & 8e{-5} \\
+Total steps                & 300k \\
+Warmup steps               & 10k \\
+$\beta_1$                  & 0.995 \\
+Weight decay               & 0.01 \\
+DropPath (init / final)    & 0.15 / 0.00 \\
+Reg. noise $\sigma$        & 5e{-4} \\
+Denoise loss weight        & 0.01 \\
+Head aggregation           & Sum \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% \subsubsection{Ligand Binding Affinity}
+% Note details on: conditional denoising lig vs pocket. Atom masking in output
+
+\begin{table}[t]
+\centering
+\caption{Finetuning hyperparameters for the Ligand Binding Affinity (LBA) benchmark}
+\label{tab:lba_hparams}
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Batch size                  & 8 \\
+Learning rate (from scratch) & 2e{-4} \\
+Learning rate (finetuning)   & 1e{-4} \\
+Total steps                 & 30k \\
+Warmup steps                & 500 \\
+$\beta_1$                   & 0.995 \\
+Weight decay                & 0.05 \\
+DropPath                    & 0.15 \\
+Reg. noise $\sigma$         & 0.005 \\
+Denoise loss weight         & 0.1 \\
+Head aggregation            & Mean \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% \subsubsection{MD17}
+\begin{table}[t]
+\centering
+\caption{Training hyperparameters for the MD17 benchmark.}
+\label{tab:md17_hparams}
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Value} \\
+\midrule
+Backbone                  & CT-small \\
+Training set size         & 1{,}000 \\
+Batch size                & 8 \\
+Energy loss EMA           & 0.05 \\
+Energy loss weight        & 0.8 \\
+Force loss weight         & 0.2 \\
+Learning rate             & 5e{-4} \\
+Warmup steps              & 5k \\
+Total steps               & 150k \\
+$\beta_1$                 & 0.995 \\
+Weight decay              & 0.01 \\
+DropPath (init / final)   & 0.15 / 0.00 \\
+Reg. noise $\sigma$       & 0.005 \\
+Denoise loss weight       & 0.1 \\
+Head aggregation          & Sum \\
+\bottomrule
+\end{tabular}
+\end{table}
+

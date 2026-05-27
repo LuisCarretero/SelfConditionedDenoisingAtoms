@@ -1,0 +1,33 @@
+\begin{table}[h]
+\centering
+\caption{\textbf{Matbench Bandgap Prediction}. SCD models achieve competitive performance with significantly fewer parameters and unlabeled structures. Within each category best results are \textbf{bolded}; second best are \underline{underlined}.}
+\label{tab:mpgap_brief}
+\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l c r r}
+\toprule
+\textbf{Model} & \textbf{MAE (eV)} & \textbf{Params} & \textbf{Data} \\
+\midrule
+\textbf{No Pretraining} \\
+coGN \cite{CoGN_ruff2023} & \textbf{0.156} & --- & n/a \\ 
+CT (Baseline) & \underline{0.186}\textsuperscript{\textdagger} & 10M & n/a \\
+JMP-S \cite{JMP_Shoghi2023} & 0.235\textsuperscript{\textdagger} & 25.2M & n/a \\ 
+JMP-L \cite{JMP_Shoghi2023} & 0.228\textsuperscript{\textdagger} & 235M & n/a \\ 
+MODNet \cite{MODNet_DeBreuck2021} & 0.220 & --- & n/a \\ 
+\midrule
+\textbf{FE Pretrained} \\
+JMP-L \cite{JMP_Shoghi2023} & \textbf{0.091} & 235M & 120M \\ 
+JMP-S \cite{JMP_Shoghi2023} & \underline{0.121} & 27M & 120M \\
+CT-FE-OMOL25 & 0.134\textsuperscript{\textdagger} & 10M & 4M \\
+HackNIP \cite{HackNIP_kim2025} & 0.150 & $>25$M & $>32$M\textsuperscript{*} \\
+\midrule
+\textbf{SCD Pretrained (Ours)} \\
+CT-SCD-AMP20 & \textbf{0.123} & 10M & 675k \\
+CT-SCD-ALL & \underline{0.132}\textsuperscript{\textdagger} & 10M & 11.3M \\
+CT-SCD-OMOL25 & 0.136\textsuperscript{\textdagger} & 10M & 4M \\
+\bottomrule
+\end{tabular}
+\vspace{0.25em}
+\flushleft\footnotesize \textsuperscript{\textdagger} Reported from Fold 0. See full results in table \ref{tab:mpgap_full}. \\
+\textsuperscript{*} Estimated from Orb-v2 backbone.
+\end{table}

@@ -1,0 +1,71 @@
+% % ########################### LBA Single column summary table ####################################
+% \begin{table}[h]
+% \centering
+% \caption{\textbf{Ligand binding affinity:} Results (RMSE) from Models evaluated on the 30\% sequence identity split. SCD models achieve parity with supervised SOTA despite significantly smaller parameter counts. Best results are \textbf{bolded}; second best are \underline{underlined}. }
+% \label{tab:lba_brief}
+% \small
+% \begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l r r}
+% \toprule
+% \textbf{Model} & \textbf{RMSE} $\downarrow$ & \textbf{Params} \\
+% \midrule
+% \textbf{No Pretraining} \\
+% % ProtNet-All-Atom \cite{ProtNet_wang2023} & 1.463 & --- \\
+% ProtNet \cite{ProtNet_wang2023} & 1.463 & --- \\
+% EPT-Scratch \cite{EPT_jiao2025} & \textbf{1.378} & 30M \\
+% CT (Baseline) & 1.510 & 10M \\
+% \midrule
+% \textbf{Other Pretrained} \\
+% Uni-Mol \cite{UniMol_Zhou2023} & 1.520 & 47.6M \\
+% EPT-Protein \cite{EPT_jiao2025} & 1.329 & 30M \\
+% EPT-MultiDomain \cite{EPT_jiao2025} & \underline{1.322} & 30M \\
+% ADiT-S \cite{lba-adit} & 1.337 & 12M \\
+% ADiT-M \cite{lba-adit} & 1.353 & 35M \\
+% ADiT-L \cite{lba-adit} & \textbf{1.308} & 253M \\
+% \midrule
+% \textbf{SCD Pretrained (Ours)} \\
+% CT-SCD-ALL & 1.372 & 10M \\
+% CT-SCD-SAIR & \underline{1.337} & 10M \\
+% CT-SCD-SAIR-Pocket & \textbf{1.304} & 10M \\
+% CT-SCD-OMOL25 & 1.389 & 10M \\
+% \bottomrule
+% \end{tabular*}
+% \footnotesize Full results provided in Table \ref{tab:lba_full}.
+% \end{table}
+
+
+% % ########################### LBA Single column summary table ####################################
+\begin{table}[h]
+\centering
+\caption{\textbf{Ligand binding affinity:} RMSE on the 30\% (id30) and 60\% (id60) sequence identity overlap splits. Best results are \textbf{bolded}; second best are \underline{underlined}. }
+\label{tab:lba_brief}
+\small
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l r r}
+\toprule
+\textbf{Model} & \textbf{RMSE: id30 / id60} $\downarrow$ & \textbf{Params} \\
+\midrule
+\textbf{No Pretraining} \\
+% ProtNet-All-Atom \cite{ProtNet_wang2023} & 1.463 & --- \\
+ProtNet \cite{ProtNet_wang2023} & 1.463 / 1.343 & --- \\
+EPT-Scratch \cite{EPT_jiao2025} & 1.378 / 1.277 & 30M \\
+CT (Baseline) & 1.510 / 1.386 & 10M \\
+\midrule
+\textbf{Other Pretrained} \\
+Uni-Mol \cite{UniMol_Zhou2023} & 1.520 / 1.619 & 47.6M \\
+EPT-Protein \cite{EPT_jiao2025} & 1.329 / 1.235 & 30M \\
+EPT-Multi \cite{EPT_jiao2025} & 1.322 / 1.227 & 30M \\
+ADiT-S \cite{lba-adit} & 1.337 / 1.413 & 12M \\
+ADiT-M \cite{lba-adit} & 1.353 / 1.335 & 35M \\
+ADiT-L \cite{lba-adit} & \underline{1.308} / 1.246 & 253M \\
+\midrule
+\textbf{SCD Pretrained (Ours)} \\
+CT-SCD-ALL & 1.372 / 1.218 & 10M \\
+CT-SCD-PCQ & 1.332 / 1.226 & 10M \\
+CT-SCD-SAIR & 1.337 / \underline{1.196} & 10M \\
+CT-SCD-SAIR-Pocket & \textbf{1.304} / 1.200 & 10M \\
+CT-SCD-OMOL25 & 1.389 / \textbf{1.175} & 10M \\
+\bottomrule
+\end{tabular*}
+\footnotesize Full results provided in Table \ref{tab:lba_full}.
+\end{table}
+
+

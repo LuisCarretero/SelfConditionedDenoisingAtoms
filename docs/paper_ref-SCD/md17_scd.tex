@@ -1,0 +1,60 @@
+\begin{table}[t]
+\centering
+\caption{SCD achieves comparable performance on MD17 force--energy prediction to prior methods while using a smaller and faster architecture. Best results are in \textbf{bold}, second best are \underline{underlined}.}
+\label{tab:md17_scd}
+\renewcommand{\arraystretch}{1.15}
+\setlength{\tabcolsep}{6pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{l|cccc!{\vrule width 1.2pt}cc}
+\toprule
+\multicolumn{1}{l|}{\textbf{Method}}              
+& \textbf{Baseline} 
+& \textbf{Coord} 
+& \textbf{SCD} 
+& \textbf{SCD (force-denoise)} 
+& \textbf{Frad (force-denoise)} 
+& \textbf{SliDe} \\
+
+\multicolumn{1}{l|}{\textbf{Architecture}}        
+& ET-small 
+& ET-small 
+& CT-small 
+& CT-small 
+& GET-small 
+& GET-small \\
+
+\multicolumn{1}{l|}{\textbf{Pretraining dataset}} 
+& none 
+& PCQ 
+& PCQ 
+& PCQ 
+& PCQ 
+& PCQ \\
+\midrule
+\multicolumn{7}{l}{\textbf{Forces MAE (kcal/mol/\AA)}}\\
+\midrule
+Aspirin         & 0.253 & 0.211 & 0.210 & \underline{0.200} & 0.209 & \textbf{0.174} \\
+Benzene        & 0.196 & \textbf{0.169} & 0.171 & 0.175 & 0.199 & \textbf{0.169} \\
+Ethanol        & 0.109 & 0.096 & 0.120 & 0.116 & \underline{0.091} & \textbf{0.088} \\
+Malonaldehyde  & 0.169 & 0.139 & 0.186 & 0.173 & \textbf{0.142} & 0.154 \\
+Naphthalene    & 0.061 & 0.053 & \underline{0.041} & \textbf{0.040} & 0.053 & 0.048 \\
+Salicylic acid & 0.129 & 0.109 & \underline{0.101} & \textbf{0.099} & 0.108 & \underline{0.101} \\
+Toluene        & 0.067 & 0.058 & \underline{0.053} & \textbf{0.051} & 0.054 & 0.054 \\
+Uracil         & 0.095 & 0.074 & 0.077 & \textbf{0.072} & \underline{0.076} & 0.083 \\
+\midrule[1.2pt]
+\multicolumn{7}{l}{\textbf{Energy MAE (kcal/mol)}}\\
+\midrule
+Aspirin         & 0.123 & -- & 0.0742 & \textbf{0.0705} & -- & -- \\
+Benzene         & 0.058 & -- & 0.0274 & \textbf{0.0211} & -- & -- \\
+Ethanol         & 0.052 & -- & 0.0286 & \textbf{0.0280} & -- & -- \\
+Malonaldehyde   & 0.077 & -- & 0.0432 & \textbf{0.0417} & -- & -- \\
+Naphthalene     & 0.085 & -- & 0.0163 & \textbf{0.0156} & -- & -- \\
+Salicylic acid  & 0.093 & -- & \textbf{0.0286} & 0.0290 & -- & -- \\
+Toluene         & 0.074 & -- & \textbf{0.0181} & 0.0184 & -- & -- \\
+Uracil          & 0.090 & -- & \textbf{0.0190} & 0.0193 & -- & -- \\
+\bottomrule
+\end{tabular}
+}
+\vspace{0.5em}
+\caption*{\footnotesize CGT results on MD17 are omitted due to an unresolved segmentation fault during backpropagation.}
+\end{table}

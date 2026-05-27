@@ -12,6 +12,8 @@ tmp/
 experiments/
 wandb/
 logs/
+slurm_logs/
+.pixi/
 
 # Distribution / packaging
 .Python

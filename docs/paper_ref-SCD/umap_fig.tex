@@ -1,0 +1,27 @@
+
+% ########### UMPA figure
+% \begin{figure*}[t]
+%   \centering
+%   % Make sure the path to your image is correct relative to your main tex file
+%   % \caption{\textbf{UMAP visualization of pretrained model embeddings.} Embeddings for 10k QM9 molecules are colored by atom count ($N$). Untrained GNNs show strong clustering biased by simple features like $N$. Models with higher downstream performance exhibit smoother embedding manifolds with less trivial correlation to $N$. Downstream performance improves from left to right: (a) $<$ (b) $<$ (c) $<$ (d).}
+%   % \label{fig:umap_wide}
+  
+%   \includegraphics[width=\linewidth]{umap_fig.png}
+%   \caption{UMAP of untrained and pretrained model embeddings for 10k QM9 molecules. Points are colored by number of atoms (N) per molecule. Row a) shows that untrained GNNs are biased towards over clustering molecular embeddings at high correlation with number of nodes/atoms (N) - 'extensive representation'. In rows b, node denoising smooths the representation space, but does not adequately address the bias towards extensive representation. Rows c and d show that embeddings from SCD model are less extensive, and smoother. We find that pretrained models with smoother, less extensive representation provide better downstream performance in property prediction. Performance trend: worst $a<b<c<d$ best.}
+%   \label{fig:umap}
+% \end{figure*}
+
+% \begin{figure*}[t]
+%   \centering 
+%   \includegraphics[width=\linewidth]{umap_fig.png}
+%   \caption{UMAP of untrained and pretrained model embeddings for 10k QM9 molecules. Points are colored by number of atoms (N) per molecule. Row a) shows that untrained GNNs are biased towards over clustering molecular embeddings at high correlation with number of nodes/atoms (N) - 'extensive representation'. In rows b, node denoising smooths the representation space, but does not adequately address the bias towards extensive representation. Rows c and d show that embeddings from SCD model are less extensive, and smoother. We find that pretrained models with smoother, less extensive representation provide better downstream performance in property prediction. Performance trend: worst $a<b<c<d$ best.}
+%   \label{fig:umap}
+% \end{figure*}
+
+\begin{figure*}[t]
+  \centering
+  % \includegraphics[width=\linewidth]{umap_fig.png}
+  \includegraphics[width=0.85\linewidth]{umap_fig.png}
+  \caption{\textbf{Pretraining Effects on the Embedding Space.} UMAP visualizations of embeddings for 10k QM9 molecules, colored by atom count ($N$). \textbf{(a)} Untrained GNNs exhibit a strong bias towards "extensive" representations, clustering molecules primarily by size ($N$). \textbf{(b)} Standard node denoising smooths the latent manifold but embeddings remain highly extensive. \textbf{(c--d)} SCD pretraining yields a smoother, less extensive (more semantic) embedding space. We observe that downstream performance improves as representations becomes smoother and less extensive (Performance: $a < b < c < d$). 'Molecule embeddings' are created by passing sum pooled atom embeddings through a two-layer MLP 'embedding head'. In the case of 'ET-Coord' the embedding head is untrained. In SCD 'Molecule embeddings' are used for self-embeddings. In our 'coord' model, the molecule 'embedding head' remains untrained.}
+  \label{fig:umap}
+\end{figure*}

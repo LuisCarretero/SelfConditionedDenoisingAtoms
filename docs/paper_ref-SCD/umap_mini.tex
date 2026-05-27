@@ -1,0 +1,10 @@
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{umap_mini.png}
+  % \includegraphics[width=0.85\linewidth]{umap_fig.png}
+  \caption{\textbf{UMAP of molecule embeddings colored by atom count:} SCD results in smoother, less extensive, semantically rich representation. 'Coord' refers to standard node denoising pretraining. See figure \ref{fig:umap} for additional plots and details.
+  % UMAP visualizations of embeddings for 10k QM9 molecules, colored by atom count ($N$). \textbf{(a)} Untrained GNNs exhibit a strong bias towards "extensive" representations, clustering molecules primarily by size ($N$). \textbf{(b)} Standard node denoising smooths the latent manifold but embeddings remain highly extensive. \textbf{(c--d)} SCD pretraining yields a smoother, less extensive (more semantic) embedding space. We observe that downstream performance improves as representations becomes smoother and less extensive (Performance: $a < b < c < d$). 'Molecule embeddings' are created by passing sum pooled atom embeddings through a two layer MLP 'embedding head'. In SCD 'Molecule embeddings' are used for self-embeddings. In our 'coord' model, the molecule 'embedding head' remains untrained.
+  }
+  \label{fig:umap_mini}
+\end{figure}

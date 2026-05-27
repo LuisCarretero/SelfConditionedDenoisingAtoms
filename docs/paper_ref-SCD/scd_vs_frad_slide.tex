@@ -1,0 +1,26 @@
+% ######### QM9: SCD vs Frad/slide SSL ###############
+\begin{table}[t]
+\centering
+\caption{\textbf{SCD vs. Variations on Node Denoising}. All models are pretrained on PCQ. Percent improvement (\% imp.) is calculated between SliDe and SCD pretraining with the most similar backbone, CGT. \textbf{Bold} denotes best; \underline{underline} denotes second best. All values reported as MAE on the test set.}
+\label{tab:scd_vs_frad_slide}
+\small
+\setlength{\tabcolsep}{3pt} % Tightens horizontal spacing
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l r r r r r}
+\toprule
+\textbf{Method} & \textbf{Frad} & \textbf{SliDe} & \textbf{SCD} & \textbf{SCD} & \textbf{\% imp.}\\
+Backbone & GET & GET & CT & CGT & vs. SliDe \\
+\midrule
+HOMO (meV) & 15.2 & 13.6 & \underline{12.7} & \textbf{9.65} & 29.0\% \\
+LUMO (meV) & 13.7 & 12.3 & \underline{11.5} & \textbf{9.05} & 26.4\% \\
+Gap (meV)  & 27.8 & 26.2 & \underline{24.5} & \textbf{19.7} & 24.8\% \\
+ZPVE (meV) & 1.42 & 1.52 & \textbf{1.18} & \underline{1.22} & 19.8\% \\
+$U_0$ (meV) & 5.33 & 4.28 & \textbf{3.58} & \underline{3.97} & 8.1\% \\
+$U$ (meV)   & 5.62 & 4.29 & \textbf{3.50} & \underline{4.11} & 4.4\% \\
+$H$ (meV)   & 5.55 & 4.26 & \textbf{3.52} & \underline{4.00} & 6.5\% \\
+$G$ (meV)   & 6.19 & 5.37 & \textbf{5.29} & \underline{5.29} & 1.5\% \\
+$\alpha$ ($a_0^3$) & \underline{0.0374} & \textbf{0.0366} & 0.0377 & 0.0383 & -4.6\% \\
+$C_v$ (cal/molK) & 0.020 & \textbf{0.019} & 0.021 & \textbf{0.019} & 0.0\% \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\end{table}

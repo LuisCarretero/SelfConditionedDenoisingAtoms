@@ -1,0 +1,49 @@
+
+\begin{table}[t]
+\centering
+\caption{\textbf{Architecture Efficiency Comparison}. Benchmarked using QM9 molecules, with batch size 128, averaged over 32 batches, on a NVIDIA RTX A5000 GPU. All models share identical embedding dimensions, layer counts, and attention heads. Parameter counts in this table encompass only backbone architecture, excluding the embedding and prediction heads. All metrics shown are computed from singular forward passes.}
+\label{tab:arch_speed_mem}
+\small
+
+% --------- Subtable A: Absolute Metrics ----------
+\begin{subtable}{\linewidth}
+\centering
+\caption{\textbf{Absolute Metrics}: Latency (lower is better), Throughput (higher is better), and Memory.}
+\label{tab:arch_speed_mem_abs}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l c cc cc cc cc}
+\toprule
+\textbf{Model} & \textbf{Params} & \multicolumn{2}{c}{\textbf{Latency (ms)} $\downarrow$} & \multicolumn{2}{c}{\textbf{Throughput (samp/s)} $\uparrow$} & \multicolumn{2}{c}{\textbf{Avg Mem (GB)}} & \multicolumn{2}{c}{\textbf{Peak Mem (GB)}} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6} \cmidrule(lr){7-8} \cmidrule(lr){9-10}
+& (M) & Eval & Train & Eval & Train & Eval & Train & Eval & Train \\
+\midrule
+ET & 6.5 & 65.7 & 69.1 & 1946 & 880 & 0.04 & 0.13 & 1.07 & 8.47 \\
+CT & 9.2 & 70.6 & 74.5 & 1812 & 802 & 0.05 & 0.15 & 1.08 & 9.00 \\
+GET & 13.4 & 264.9 & 369.5 & 483 & 194 & 0.07 & 0.18 & 1.62 & 20.37 \\
+CGT & 16.0 & 262.8 & 379.3 & 487 & 189 & 0.08 & 0.20 & 1.63 & 20.72 \\
+\bottomrule
+\end{tabular}
+\end{subtable}
+
+\vspace{1em}
+
+% --------- Subtable B: Relative Metrics ----------
+\begin{subtable}{\linewidth}
+\centering
+\caption{\textbf{Relative Metrics}: Normalized to ET baseline ($1.0\times$).}
+\label{tab:arch_speed_mem_rel}
+\setlength{\tabcolsep}{8pt}
+\begin{tabular}{l c cc cc}
+\toprule
+\textbf{Model} & \textbf{Param Ratio} & \multicolumn{2}{c}{\textbf{Rel. Speed} $\uparrow$} & \multicolumn{2}{c}{\textbf{Rel. Avg Mem} $\downarrow$} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6}
+& & Eval & Train & Eval & Train \\
+\midrule
+ET & $1.00\times$ & $1.00\times$ & $1.00\times$ & $1.00\times$ & $1.00\times$ \\
+CT & $1.40\times$ & $0.92\times$ & $0.93\times$ & $1.25\times$ & $1.15\times$ \\
+GET & $2.00\times$ & $0.25\times$ & $0.19\times$ & $1.67\times$ & $1.38\times$ \\
+CGT & $2.45\times$ & $0.25\times$ & $0.18\times$ & $1.90\times$ & $1.53\times$ \\
+\bottomrule
+\end{tabular}
+\end{subtable}
+\end{table}

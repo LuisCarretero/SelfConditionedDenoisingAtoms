@@ -1,0 +1,28 @@
+% ######### QM9: Training on a variaty of different datasets ###############
+\begin{table*}[t]
+\centering
+\caption{\textbf{SCD Pretraining on Diverse Data Sources}. SCD enables effective pretraining across ground-state and non-equilibrium conformers from varied sources. Every pretraining configuration tested shows improvement over the non-pretrained baseline.}
+\label{tab:scd_on_conformers}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l l r r r}
+\toprule
+\textbf{Pretraining Dataset} & \textbf{Source / Quality} & \textbf{Unique Mol.} & \textbf{Total Geom.} & \textbf{QM9 HOMO} \\ 
+& & & & (MAE, meV) \\
+\midrule
+baseline &   &   &   & 20.3 \\ 
+\midrule
+\textbf{PCQ} & DFT (B3LYP/6-31G*) & 3,378,606 & 3,378,606 & \textbf{12.7} \\ 
+\textbf{PCQ-300k} & DFT (B3LYP/6-31G*) & 300,000 & 300,000 & 13.0 \\ 
+\textbf{GEOM10} & xTB (Conformers) & 304,339 & 2,791,929 & 13.2 \\ 
+\textbf{GEOM1} & xTB (Lowest Energy) & 304,339 & 304,339 & 13.7  \\ 
+\textbf{AMP20} & DFT (PBEsol) & 675,204 & 675,204 & 14.6 \\ 
+\textbf{SAIR} & Boltz-1 (Synthetic Conformers) & 888,104 & 4.4M & 14.6 \\ 
+% \textbf{SAIR-Ligand} & Boltz-2 (Conformers) & 888,104 & 4.4M & 14.9  \\ 
+\textbf{SAIR-Pocket} & Boltz-1 (Synthetic Conformers)  & 888,104 & 4.4M & 14.5  \\ 
+\textbf{ALL} & Mixed Aggregate & 5,246,253 & 11.3M & \textbf{12.7} \\ 
+\textbf{OMol25}\textsuperscript{1} & Non-equilibrium (MD) & --- & 3,986,754 & 12.8 \\ 
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\flushleft\footnotesize \textsuperscript{1} The number of unique molecules in the OMol25 4M split is not reported \cite{OMOL25_levine2025open}.
+\end{table*}

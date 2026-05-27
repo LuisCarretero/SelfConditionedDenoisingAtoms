@@ -1,0 +1,26 @@
+% ############ SUMMARY TABLE ############
+\begin{table*}[t]
+\centering
+\caption{\textbf{Comparing the Impact of Different Pretraining Data}. Pretraining on any data source benefits every task, though downstream performance gains are greatest when pretraining on in-domain data. Datasets with high elemental diversity yield the highest average improvements. \textit{CT-FE} models denote supervised force-energy pretraining; \textit{CT-SCD} denotes self-supervised pretraining. Best results are \textbf{bold}; second best are \underline{underlined}.}
+\label{results_summary}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l r r r r r r r}
+\toprule
+ & \multicolumn{2}{c}{\textbf{QM9 (Small Mol.)}} & \multicolumn{2}{c}{\textbf{Matbench (Crystals)}} & \multicolumn{2}{c}{\textbf{LBA (Proteins)}} & \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+\textbf{Model} & \textbf{HOMO} & \textbf{\% imp.} & \textbf{MP Gap} & \textbf{\% imp.} & \textbf{RMSE} & \textbf{\% imp.} & \textbf{Avg \%} \\
+(Pretraining Data) & (meV) & & (eV) & & (id60) & & \textbf{imp.} \\
+\midrule
+ET/CT (Baseline) & 20.3 & 0.0\% & 0.186 & 0.0\% & 1.386 & 0.0\% & 0.0\% \\
+\midrule
+CT-SCD-PCQ & \textbf{12.7} & 37.4\% & 0.174 & 6.5\% & 1.226 & 11.5\% & 18.5\% \\
+CT-SCD-GEOM10 & \underline{13.2} & 35.0\% & 0.177 & 4.8\% & 1.211 & 12.6\% & 17.5\% \\
+CT-SCD-AMP20 & 14.6 & 28.1\% & \textbf{0.122} & 34.4\% & 1.219 & 12.0\% & 24.8\% \\
+CT-SCD-SAIR & 14.6 & 28.1\% & 0.182 & 2.2\% & 1.196 & 13.7\% & 14.6\% \\
+CT-SCD-ALL & \textbf{12.7} & 37.4\% & \underline{0.132} & 29.0\% & 1.218 & 12.1\% & \underline{26.2}\% \\
+\midrule
+CT-FE-OMol25 & 13.6 & 33.0\% & 0.134 & 28.0\% & \underline{1.187} & 14.4\% & 25.1\% \\
+CT-SCD-OMol25 & 12.8 & 36.9\% & 0.136 & 26.9\% & \textbf{1.175} & 15.2\% & \textbf{26.4}\% \\
+\bottomrule
+\end{tabular*}
+\end{table*}

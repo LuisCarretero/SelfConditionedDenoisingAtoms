@@ -1,0 +1,39 @@
+% % ######### Matbench: FULL Results ############### ---- Appendix
+\begin{table*}[t]
+\centering
+\caption{\textbf{SCD on Periodic Materials}: Matbench band gap prediction performance for SCD and supervised force-energy (FE) pretrained models. Best results within each category are \textbf{bolded}; second best are \underline{underlined}. SCD models achieve competitive performance while utilizing significantly fewer parameters and unlabeled structures.}
+\label{tab:mpgap_full}
+\small
+\begin{tabular*}{\textwidth}{@{\extracolsep{\fill}}l l c c r r}
+\toprule
+\textbf{Category} & \textbf{Model} & \multicolumn{2}{c}{\textbf{MP Gap (eV)}} & \textbf{\# Params} & \textbf{Pretraining} \\
+\cmidrule(lr){3-4}
+& & \textbf{Fold 0} & \textbf{Mean (0--4)} & & \textbf{Data Size} \\
+\midrule
+No Pretraining & MODNet \cite{MODNet_DeBreuck2021} & 0.215 & 0.220 & --- & n/a \\ 
+ & coGN \cite{CoGN_ruff2023} & \textbf{0.153} & \textbf{0.156} & --- & n/a \\ 
+ & JMP-S \cite{JMP_Shoghi2023} & 0.235 & --- & 25.2M & n/a \\ 
+ & JMP-L \cite{JMP_Shoghi2023} & 0.228 & --- & 235M & n/a \\ 
+ & CT (Baseline) & \underline{0.186} & --- & 10M & n/a \\
+ % & CGT & nan & nan & 10M & n/a \\
+\midrule
+FE Pretrained & JMP-L \cite{JMP_Shoghi2023} & \textbf{0.089} & \textbf{0.091} & 235M & 120M \\ 
+ & JMP-S \cite{JMP_Shoghi2023} & \underline{0.119} & \underline{0.121} & 27M & 120M \\
+ & HackNIP (Orb-v2 + MODNet) \cite{HackNIP_kim2025} & --- & 0.150 & $>25.2$M & $>32$M\textsuperscript{*} \\
+ & CT-FE-OMOL25 & 0.134 & --- & 10M & 4M \\
+
+\midrule
+Other SSL & Crystal-Twins \cite{xtal_twins} & --- &  0.264 & --- & 428k \\
+
+\midrule
+SCD Pretrained & CT-SCD-AMP20 & \textbf{0.122} & \textbf{0.123} & 10M & 675k \\
+ & CT-SCD-ALL & \underline{0.132} & --- & 10M & 11.3M \\
+ & CT-SCD-PCQ & 0.174 & --- & 10M & 3.4M \\
+ & CT-SCD-GEOM10 & 0.177 & --- & 10M & 2.8M \\
+ & CT-SCD-SAIR & 0.182 & --- & 10M & 4.4M \\
+ & CT-SCD-OMOL25 & 0.136 & --- & 10M & 4M \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\flushleft\footnotesize \textsuperscript{*}Orb-v2 data size estimated from the sum of force-energy finetuning datasets: MPTraj (1.58M) and Alexandria (30.5M) \cite{HackNIP_kim2025}.
+\end{table*}

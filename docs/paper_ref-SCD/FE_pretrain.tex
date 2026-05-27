@@ -1,0 +1,49 @@
+\begin{table}[h]
+\centering
+\caption{\textbf{OMol25 4M Force-Energy Pretraining}. Comparison of supervised force-energy training baselines (FE) against fine-tuning from SCD pretrained weights (SCD-FE). We compare direct force prediction (Forward) against gradient-based force calculation (Backward). CT-SCD-OMOL25 is pretrained by SCD using the same Omol25 4 geometries.}
+\label{tab:fe_pretrain}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l l l c cl}
+\toprule
+\textbf{Model Name} & \textbf{Initialization} & \textbf{Force Method} & \textbf{Val Force MAE} & \textbf{Val Energy MAE}  & \textbf{num training steps}\\
+& & & (meV/\AA) & (meV)  &\\
+\midrule
+FE-Fwd & From Scratch & Forward & 44.8 & 648  &800k\\
+FE-Fwd-long & From Scratch & Forward & 42.6 & 606  &1600k\\
+FE-Bwd & From Scratch & Backward & 50.0 & 618  &800k\\
+
+\midrule
+SCD-FE-Fwd & CT-SCD-OMOL25 & Forward & 42.9 \small(+4.2\%) & \textbf{617} \small(+4.8\%)  &800k (+800k SCD)\\
+SCD-FE-Bwd & CT-SCD-OMOL25 & Backward & \textbf{41.4} \small(+17.2\%) & 665 \small(-7.6\%) &800k (+800k SCD)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{table}[h]
+\centering
+\caption{\textbf{Fine-tuning Force-Energy Pretrained Models}. Force-energy pretrained models performed best when the energy head was reset and regularization noise was turned off during finetuning. Forward (non-conservative) force pretraining, conveyed the best average results on downstream property prediction and is reported as 'CT-FE-OMOL25' elsewhere.
+}
+\label{tab:fe_finetune}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l l c cl}
+\toprule
+\textbf{Model} & \textbf{Fine-tuning Protocol} & \textbf{HOMO} & \textbf{$U_0$}  &avg \% impv. \\
+& & (meV) & (meV)  &over baseline\\
+\midrule
+ baseline& & 20.3& 6.15&---\\
+\midrule
+FE-Fwd & Standard & 15.9 & 12.9  &-44.0\%\\
+FE-Fwd & Reset Head, $\sigma_{\text{reg}}=0.005$ & 15.0 & 10.2  &-19.9\%\\
+FE-Fwd & Reset Head, $\sigma_{\text{reg}}=0$ & 13.6 & 3.40  &38.9\%\\
+FE-Fwd-long & Reset Head, $\sigma_{\text{reg}}=0$ & 13.7 & 3.47  &38.0\%\\
+FE-Bwd & Reset Head, $\sigma_{\text{reg}}=0$ & 14.5 & 3.36  &37.0\%\\
+\midrule
+CT-SCD-OMol25 & Standard & 12.8 & 3.54  & 39.7\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+

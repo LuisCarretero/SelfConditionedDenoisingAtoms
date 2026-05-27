@@ -1,0 +1,27 @@
+
+% ######### QM9: SCD vs Denoising ###############
+\begin{table}[t]
+\centering
+\caption{\textbf{SCD vs. Standard Node Denoising}. Given the same backbone and pretraining datasets (PCQ), SCD significantly outperforms standard denoising (\textit{Coord}). Best results are \textbf{bolded}. All values reported as MAE on the test set.}
+\label{tab:scd_vs_coord}
+\small
+\setlength{\tabcolsep}{5pt} % Adjusts padding for single-column fit
+\begin{tabular*}{\columnwidth}{@{\extracolsep{\fill}}l r r r r}
+\toprule
+\textbf{Method} & \textbf{Baseline} & \textbf{Coord} & \textbf{SCD} & \textbf{\% imp.} \\
+Backbone & ET & ET & CT & vs. Coord \\
+\midrule
+HOMO (meV) & 20.3 & 17.7 & \textbf{12.7} & 28.2\% \\
+LUMO (meV) & 17.5 & 14.3 & \textbf{11.5} & 19.6\% \\
+Gap (meV)  & 36.1 & 31.8 & \textbf{24.5} & 23.0\% \\
+ZPVE (meV) & 1.84 & 1.71 & \textbf{1.18} & 21.0\% \\
+$U_0$ (meV) & 6.15 & 6.57 & \textbf{3.58} & 45.5\% \\
+$U$ (meV)   & 6.38 & 6.11 & \textbf{3.50} & 42.7\% \\
+$H$ (meV)   & 6.16 & 6.45 & \textbf{3.52} & 45.4\% \\
+$G$ (meV)   & 7.62 & 6.91 & \textbf{5.29} & 23.4\% \\
+$\alpha$ ($a_0^3$) & 0.059 & 0.0517 & \textbf{0.0377} & 27.1\% \\
+$C_v$ (cal/molK) & 0.026 & \textbf{0.020} & 0.021 & $-$5.0\% \\
+\bottomrule
+\end{tabular*}
+\vspace{0.25em}
+\end{table}
