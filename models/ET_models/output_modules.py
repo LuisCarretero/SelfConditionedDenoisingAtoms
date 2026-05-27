@@ -132,7 +132,12 @@ class GatedEquivariantBlock(nn.Module):
                     "These atoms will not interact with any other atom unless you change the cutoff."
                 )
             )
-        vec1[mask] = torch.norm(vec1_buffer[mask], dim=-2) # NOTE: this is equivariant restriction on expresivity
+        # `torch.norm` is on autocast's fp32-promotion list, so under
+        # `--precision bf16-mixed` it returns fp32 even on bf16 input. `vec1`
+        # is bf16 (created with `dtype=vec1_buffer.dtype`, and vec1_buffer
+        # comes from the autocast-bf16 Linear above). Cast back to the
+        # destination dtype so the in-place write doesn't raise.
+        vec1[mask] = torch.norm(vec1_buffer[mask], dim=-2).to(vec1.dtype) # NOTE: this is equivariant restriction on expresivity
 
         vec2 = self.vec2_proj(v)
         x = torch.cat([x, vec1], dim=-1) # [B, 4, d]
