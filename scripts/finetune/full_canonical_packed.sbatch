@@ -7,8 +7,9 @@
 # Each lane runs 349 whole epochs (paper's 300k steps ≈ 348.84 epochs;
 # whole-epochs config keeps the train/val ratio stable across arms). With
 # probe-extrapolated step times ~80–112 ms × 860 batches/epoch × 349 epochs,
-# the slowest arm (baseline) lands at ~9.5h wall — comfortably under the 11h
-# allocation.
+# the slowest arm (baseline) lands at ~11.3h wall once per-epoch overhead is
+# counted (53465652 timed out 9 epochs short at the 11h gate, losing the
+# baseline lane's post-fit test). Bumping to 14h — premium MaxWall is 48h.
 #
 # Uses --load-model (paper-faithful path): the pretrained ct-scd-pcq
 # checkpoint's mean/std are 0/1 (pretrain has no y-target). Going through
@@ -27,7 +28,7 @@
 #SBATCH --gpus=4
 #SBATCH --cpus-per-task=128
 #SBATCH --gpu-bind=none
-#SBATCH -t 11:00:00
+#SBATCH -t 14:00:00
 #SBATCH -J scd_full_packed
 #SBATCH -o /global/u1/l/luisc440/workspace/SelfConditionedDenoisingAtoms/slurm_logs/full_packed_%j.out
 #SBATCH -e /global/u1/l/luisc440/workspace/SelfConditionedDenoisingAtoms/slurm_logs/full_packed_%j.err

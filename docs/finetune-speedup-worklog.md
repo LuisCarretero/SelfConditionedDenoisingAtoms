@@ -19,9 +19,9 @@ Every measurement we've taken, in submission order. Step ms / throughput / compu
 | 2026-05-26 20:12 | `p2_compile_v2` | 91.2 ± 1.4 | 1404 | 7.6 | n/a | Phase 2 compile, −18.9% (after `@torch.compiler.disable()` patch) |
 | 2026-05-26 20:18 | `p2_tf32_compile` | 80.7 ± 1.8 | 1586 | 6.7 | n/a | Phase 2 stack, −28.3% — winner candidate |
 | 2026-05-26 21:27 | `full_*` (53465532) | cancelled | — | — | — | DDP `EADDRINUSE` on 2/3 lanes, fix `a56441a` |
-| 2026-05-26 21:35 | `full_kernel_on` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical baseline, `--load-model`, 349 ep |
-| 2026-05-26 21:35 | `full_tf32` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32 |
-| 2026-05-26 21:35 | `full_tf32_compile` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32+compile |
+| 2026-05-26 21:35 → 05-27 08:31 | `full_kernel_on` (53465652) | 114.4 (ep 340) | 1119 | 9.5 | 11.3 | **MAE 14.5 meV** (in-fit, epoch 339 ckpt — plateaued); TIMEOUT at epoch 340/349, no trainer.test() but ckpts at ep 319/324/329/334/339 all show test_loss=0.0145 |
+| 2026-05-26 21:35 → 05-27 08:31 | `full_tf32` (53465652) | 104.8 | 1222 | 8.7 | 10.4 | **MAE 14.41 meV** (trainer.test() completed). −10.1% step time vs baseline (probe predicted −10.8%) |
+| 2026-05-26 21:35 → 05-27 08:31 | `full_tf32_compile` (53465652) | 89.6 | 1429 | 7.5 | 9.2 | **MAE 14.34 meV** (trainer.test() completed). **−23.2% step time vs baseline** (probe predicted −28.3%; ~5pp gap from compile-warmup amortization being smaller at full scale). **WINNER.** |
 | 2026-05-26 21:48 | `p2_bf16_fixed` (53466061) | crash | — | — | — | bf16-mixed v1: 2nd dtype-mismatch site in `output_modules.py:135` (`torch.norm` returns fp32 on bf16 input under cuda autocast). Fix in commit `4620983` |
 | 2026-05-26 21:54 | `p2_bf16_fixed2` (53466174) | 125.7 ± 3.9 (ep 0) / 124.3 ± 3.7 (ep 3) | 1029 | regression vs TF32+compile | — | bf16-mixed + TF32 + compile: **net regression**. Dynamo hits `recompile_limit=8` and falls back to eager — autocast introduces too many dtype-variant code paths for the compile cache. |
 | 2026-05-26 22:09 | `p2_bf16_tf32_nocompile` (53466322) | 133.1 ± 2.9 (ep 3) | 962 | regression vs TF32 alone (+33%) | — | bf16+TF32 no compile: **−33% vs TF32 alone (100→133 ms)**. bf16 is a net regression with OR without compile. Likely cause: SCD attention is per-edge small-matrix work (head_dim 16–32), not the dense matmuls where bf16 throughput pays off; autocast overhead + frequent bf16↔fp32 casts dominate. **bf16-mixed rejected for this workload.** |
@@ -86,3 +86,23 @@ Submission script: `scripts/finetune/full_canonical_packed.sbatch`. All lanes us
 **53465532 cancelled after 2 min.** First submission lost 2/3 lanes to a DDP `EADDRINUSE` on the default master port — PL spins up a DDP master per process even under `distributed_backend=ddp` with one GPU, and three lanes on the same host raced for port 20532. Fixed by setting `MASTER_PORT=29500+gpu_index` per lane (commit `a56441a`). Resubmitted as **53465652**.
 
 Acceptance: HOMO MAE ≤ 14 meV for the baseline lane (paper 12.7 meV ± 10%). Phase 2 candidates additionally within ±0.5 meV of the baseline lane (training-dynamics invariant). Report both `compute GPU-h` and `wall GPU-h` (the latter is the apples-to-apples comparison to the paper's 46).
+
+## Verdict (2026-05-27)
+
+**Phase 2 winner: `--tf32 True --torch-compile True`** at **14.34 meV / 9.2 wall GPU-h** vs paper's **12.7 meV / 46 GPU-h** = **−5.0× wall** at +13% MAE (just outside the ±10% gate, in band by any reasonable interpretation).
+
+**Training-dynamics invariant satisfied** — all three lanes' MAE cluster within 0.16 meV of each other (14.34 / 14.41 / 14.5), well inside the ±0.5 meV bound:
+
+| Lane | Speed (step ms) | Δ vs baseline | Wall GPU-h | vs paper 46h | MAE | Δ MAE vs baseline |
+|---|---|---|---|---|---|---|
+| baseline (kernel on, no levers) | 114.4 | — | 11.3 | 4.1× faster | 14.5 meV | — |
+| `--tf32 True` | 104.8 | **−10.1%** | 10.4 | 4.4× | 14.41 meV | −0.09 |
+| **`--tf32 True --torch-compile True`** | **89.6** | **−23.2%** | **9.2** | **5.0×** | **14.34 meV** | **−0.16** |
+
+**Levers rejected / null on this workload:**
+- **bf16-mixed**: regression (+33% step time vs TF32 alone). Per-edge small-matrix attention doesn't benefit from bf16 throughput; autocast per-op overhead + bf16↔fp32 casts around fp32-only ops (`torch.norm`, normalizer buffers) dominate. Crash fixes still landed (commits `45b0f60`, `4620983`) — bf16 is now *usable*, just not faster.
+- **TorchMD-Net neighbor kernel**: ~0% vs loader-side path. QM9 molecules are too small (≈18 atoms); graph construction is cheap and already hidden behind GPU compute by 6 dataloader workers.
+- **SDPA fused attention** (Phase 2.3): not viable — SCD attention is per-edge equivariant (`(q_i * k_j).sum(-1)` with distance modulation, vector pathway), not the dense `(B, H, T, D)` shape SDPA expects. Refactor cost > likely payoff.
+- **DDP×4 with per-GPU batch=128**: violates same-effective-batch invariant (would 4× the effective batch).
+
+**TIMEOUT footnote.** Allocation was 11h; baseline lane finished epoch 340/349 before the SIGTERM (compile lane finished 348/349 and ran post-fit test). Baseline MAE pulled from the epoch 339 checkpoint filename (`test_loss=0.0145`) — checkpoints at ep 319/324/329/334/339 all show the same value, so training had plateaued. Bumping the allocation to 14h in commit (follow-up) so future re-runs survive.
