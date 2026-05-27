@@ -1,51 +1,49 @@
 # Restart note for the next agent
 
-Snapshot: 2026-05-26 ~22:30 PDT. The previous agent landed Phase 2.5 (apples-to-apples GPU-h machinery + whole-epochs config + profile sbatch), resolved the `--load-model` vs `--load-hf` open question (data-side / loss-affecting → use `--load-model`), and **submitted the three canonical full runs packed onto one premium 4-GPU node**.
+Snapshot: 2026-05-27 ~08:45 PDT. **The finetune-speedup work item is done.** Canonical full run 53465652 completed (with a recoverable TIMEOUT footnote), all three Phase 2 lanes harvested, every documented lever evaluated. Final verdict lives in `docs/finetune-speedup-worklog.md`.
 
-## TL;DR
+## TL;DR — final numbers
 
-- **Slurm job 53465652** (one sbatch, three lanes): `full_kernel_on`, `full_tf32`, `full_tf32_compile`. Live in `$SCRATCH/SCD_data/finetune_runs/53465652_canonical/<tag>/train.log` once running. Each lane is single-GPU (`CUDA_VISIBLE_DEVICES=0/1/2`, distinct `MASTER_PORT`), `--load-model <local-ckpt>`, 349 whole epochs. Walltime allocation 11h; the slowest arm (baseline) extrapolates ~9.5h. (Earlier 53465532 cancelled after 2 min — DDP port collision, fixed in commit `a56441a`.)
-- Phase 2.5 commits: `c0789a1` (TrainTiming wall-h + tests), `e474f9e` (refactor for num_steps=-1), `e0effc0` (whole-epochs config), `e01aa6c` (profile sbatch).
-- Resubmission commits: `153455e` (new packed sbatch), `e64f8c5` (worklog).
-- `--load-model` decision rationale + per-commit summary now live in `docs/finetune-speedup-worklog.md` under "Phase 2.5" + "load-model vs load-hf".
+| Lane | Step ms | Wall GPU-h | Test MAE | vs paper (46 h / 12.7 meV) |
+|---|---|---|---|---|
+| baseline (no levers) | 114.4 | 11.3 | 14.5 meV | 4.1× faster, +14% MAE |
+| `--tf32 True` | 104.8 | 10.4 | 14.41 meV | 4.4× faster, +13% MAE |
+| **`--tf32 True --torch-compile True`** | **89.6** | **9.2** | **14.34 meV** | **5.0× faster, +13% MAE** |
 
-## What's next (in order)
+Phase 2 winner: TF32 + compile. Training-dynamics invariant satisfied (MAE spread 0.16 meV ≪ ±0.5 meV bound). The bf16-mixed crash fixes landed but bf16 itself is a regression on this workload; the kernel A/B is null; SDPA isn't a viable swap for sparse equivariant attention. See worklog for the full table.
 
-### Step 1 — Wait for 53465532, then harvest
+## What to know if you're picking this back up
 
-Poll: `squeue -j 53465532` and `sacct -j 53465532 -o JobID,State,Elapsed,ExitCode -X -n`. Each lane completes independently inside the same sbatch; tail `$SCRATCH/SCD_data/finetune_runs/53465532_canonical/<tag>/train.log` per lane.
+- **No follow-up runs are queued.** All Slurm jobs (53461802, 53462549, 53462886, 53465532, 53465652, 53466061, 53466174, 53466322) are in terminal state. Nothing in `squeue -u luisc440`.
+- **Code state is final and tested**: `models/callbacks.py` (TrainTiming with wall-h), `models/trainer.py` (bf16 autocast wrappers), `models/ET_models/output_modules.py` (torch.norm dtype cast), `configs/finetune_qm9.yaml` (whole epochs), `scripts/finetune/full_canonical_packed.sbatch` (MASTER_PORT lanes + 14h allocation), `scripts/finetune/profile_run.sbatch` (PL profiler wiring), `tests/test_traintiming.py` + `tests/test_bf16_autocast.py`. All on `main`.
+- **53465652 TIMEOUT** killed the baseline lane 9 epochs short of `trainer.test()`. Recovered the MAE from the epoch 339 checkpoint filename — same `test_loss=0.0145` across the last 5 checkpoints, so the run had plateaued. No re-run needed. Allocation bumped to 14h for any future redo.
+- **W&B project**: `SCD-finetune-speedup`. Per-run logs at `$SCRATCH/SCD_data/finetune_runs/<jobid>_*/train.log` and per-lane checkpoints under `$SCRATCH/SCD_data/finetune_runs/53465652_canonical/<tag>/experiments/<tag>/`.
 
-When all three are done (sbatch returns COMPLETED), for each lane:
-1. `test_loss` from the bottom of `train.log` (Lightning prints it at the end of `trainer.test()`). Multiply ×1000 → meV.
-2. Steady-state step time and **both** GPU-h numbers from the **last** `[TrainTiming] epoch …` line (NOT the first — compile/cuDNN warmup spike inflates epochs 0–1 for the compile lane).
-3. Update the `_pending_` rows in `docs/finetune-speedup-worklog.md` under "Pending full runs (packed …)". Report `X GPU-h (compute) / Y GPU-h (wall) vs paper's 46`. **Y** is the apples-to-apples number.
-4. Gate per acceptance criteria in the worklog: baseline lane MAE ≤ 14 meV; Phase 2 candidates within ±0.5 meV of the baseline lane. Anything outside → reject + flag.
-5. Commit each worklog update (`docs/finetune-speedup-worklog.md` only).
+## What you'd want to do if extending this work
 
-### Step 2 — (Optional) profile run if val/IO breakdown is wanted
+Not low-hanging anymore — each of these requires a scope decision:
 
-`scripts/finetune/profile_run.sbatch` packs two lanes (baseline, tf32+compile) on one premium 4-GPU node with `--profile-trace-dir` enabling PL's PyTorchProfiler. Captures 200 train steps post-warmup + one val epoch + one epoch boundary. Outputs trace files + a summary `.txt` next to the traces. Only worth running if the canonical-run numbers raise a question that needs op-level granularity (e.g. val share looks unexpectedly large under compile).
+1. **Re-derive the paper's 46 GPU-h to understand the 5× gap.** Likely culprits: paper hardware was older A100s (probably A100-PCIe), torch version, or implicit overheads (eval cadence, multi-task wrappers). The plan explicitly accepts the divergence; tightening it would need access to the paper authors' setup.
+2. **Trade dynamics invariance for further speedup.** The locked invariant blocks DDP×4-with-larger-effective-batch and any "more data per step" lever. If the user accepts a small MAE drift, gradient accumulation + bigger effective batch could ~halve wall time.
+3. **Profile to find any remaining hotspots** — `scripts/finetune/profile_run.sbatch` is wired up but never launched (op-level granularity wasn't necessary to converge on the winner). Run it if you suspect non-obvious overhead. Note: the sbatch is on `gpu_premium` (full-node billing) — refactor to `gpu_shared` first if cost matters.
+4. **Hopper / Blackwell hardware.** The bf16 regression here is workload-shaped (per-edge attention with small head_dim doesn't benefit from bf16 throughput). On Hopper+ where bf16 has even more headroom and tensor cores are bigger, the calculus could flip; re-run the bf16 probe.
 
-### Step 3 — Report
+## Key commits this work landed (most recent first)
 
-Update `docs/finetune-speedup.md` ONLY if the acceptance verdict changes — e.g. if a lever is rejected. Otherwise the worklog row is the final record. The Phase 2 winner candidate going into the report is `--tf32 True --torch-compile True` (probe data: −28.3% step time, predicted (1−0.108)(1−0.189)=0.723 ⇒ −27.7% matches).
+- `56c034d` canonical 53465652 harvest + allocation bump
+- `2df6ccb` bf16 verdict — rejected (regression)
+- `4620983` output_modules: cast torch.norm result for bf16-mixed
+- `45b0f60` trainer: wrap noise_normalizer in autocast(enabled=False)
+- `a56441a` sbatch: MASTER_PORT per CUDA_VISIBLE_DEVICES (DDP collision fix)
+- `153455e` finetune: full_canonical_packed sbatch
+- `e01aa6c` Phase 2.5: --profile-trace-dir + profile_run.sbatch
+- `e0effc0` configs/finetune_qm9: whole epochs (349 × 860 ≈ 300k)
+- `e474f9e` TrainTiming: min(step_gate, epoch_gate) for num_steps=-1
+- `c0789a1` TrainTiming: wall-clock-honest GPU-h
 
-## What changed since the previous restart note
+## Things deliberately not done
 
-1. **`TrainTiming` now reports wall-clock-honest GPU-h.** Second metric `train/extrapolated_wall_h_total` = compute + per-epoch-overhead × planned-epochs + post-fit test. Per-epoch overhead is measured as `full_epoch_wall − step_s × steps_per_epoch` (captures val + reload + ckpt). Tests in `tests/test_traintiming.py` guard the math (`_extrapolate`, `_planned_train_epochs`, `_effective_total_steps`).
-2. **Config switched to whole epochs.** `configs/finetune_qm9.yaml`: `num_epochs: 349, num_steps: -1` (= 300,140 steps via 860 batches/epoch). The TrainTiming code now derives effective step count from `min(step_gate, epoch_gate × steps_per_epoch)`, so `num_steps=-1` no longer produces a negative compute-h.
-3. **`--load-model` is now the paper-faithful path.** `models/ET_models/scd_model.py:312-326` uses `model.mean/std` inside the forward pass (atom outputs × std, sum, + mean), so they're data-side / loss-affecting. The `ct-scd-pcq` pretrain has no y-target → checkpoint stores `mean=0, std=1`. `--load-model` keeps those; `--load-hf` overwrites with QM9 HOMO data stats (≈−0.4/0.04), shrinking the final-layer effective LR ~25×. Paper command uses `--load-model`; canonical sbatch now matches.
-
-## Useful runtime facts
-
-- **Cancelled jobs** 53461802 / 53462549 / 53462886 (the previous gpu_regular submissions) are CANCELLED in sacct. The packed resubmission 53465532 supersedes all three.
-- Local checkpoint path: `experiments/models--Ty-Perez--ct-scd-pcq/snapshots/fcd4353d3b9f90eb38e08ccc0050cea02623d85f/last.ckpt`. The sbatch checks this exists and exits cleanly if not.
-- `gpu_premium`: full-node, 2× factor, 48h max — fast queue. The packed pattern (3 lanes × 1 GPU each) makes premium roughly cost-equivalent to three sequential `gpu_shared` allocations while finishing all three in parallel.
-- Pixi at `/global/homes/l/luisc440/.pixi/bin/pixi`. `.pixi/` is a symlink to `$SCRATCH/SCD_data/.pixi`.
-- W&B project: `SCD-finetune-speedup`.
-
-## Things still deferred
-
-- **bf16-mixed**: needs targeted `torch.amp.autocast(enabled=False)` around `noise_normalizer` (an `AccumulatedNormalization` with side-effectful `update_statistics()` that mixes fp32 buffers with bf16 autocast tensors). Lane 3 of 53465532 is idle — a cheap retry slot if the autocast fix lands while the run is in flight; otherwise leave it alone.
-- **Phase 2.3** (fused attention, DDP scaling sweep) — only worth it if 2.2 winners at full scale leave headroom AND the profile shows where to look.
-- **DDP×4 with per-GPU batch=128** violates the "same effective batch size" invariant (would go from 128 → 512). Per-GPU batch=32 + DDP×4 would preserve effective=128 but lose arithmetic intensity. Don't enable without explicit scope change.
+- **Resubmit baseline lane to recover post-fit `trainer.test()` number.** The checkpoint-filename MAE (14.5 meV) matches the in-fit test_loss for the last 5 ckpts; the plateau is unambiguous. Re-running for 0.05 meV precision wasn't worth 11h × 1 GPU.
+- **Dataloader / `persistent_workers` tweak.** Saves ~0.2 GPU-h on a 9.2 GPU-h run (~3%). Requires changing `reload_dataloaders_every_n_epochs=val_interval` to 0 in `train.py:448`, which the original author tied to `val_interval` for a reason (comment says "to shuffle data if using small val set"). Not worth the disruption for the gain.
+- **`test_interval` bump.** `data/loaders.py:208` iterates the test_loader inside every val epoch when `epoch % test_interval == 0`. Bumping `test_interval` from 1 to 10 would save ~0.15 GPU-h. Same risk/reward calculus as above.
+- **Fused attention.** SCD attention is sparse equivariant, not dense Q/K/V. Not a clean SDPA swap.
