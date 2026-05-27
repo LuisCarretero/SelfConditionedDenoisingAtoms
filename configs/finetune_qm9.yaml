@@ -41,8 +41,12 @@ lr_min: 1.0e-07
 lr_patience: 15
 lr_warmup_steps: 10000 
 lr_cosine_length: 300000
-num_epochs: 3000 
-num_steps: 300000
+# 349 epochs × 860 batches/epoch (110k train / 128 batch) = 300,140 steps —
+# the integer-epoch count closest to the paper's 300k. Whole epochs keep the
+# train/val ratio stable across the speedup A/B runs and remove the partial
+# last-epoch ambiguity. num_steps=-1 disables the step gate so PL uses epochs.
+num_epochs: 349
+num_steps: -1
 precision: 32
 
 save_interval: 5 
