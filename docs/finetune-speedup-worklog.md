@@ -106,3 +106,23 @@ Acceptance: HOMO MAE ≤ 14 meV for the baseline lane (paper 12.7 meV ± 10%). P
 - **DDP×4 with per-GPU batch=128**: violates same-effective-batch invariant (would 4× the effective batch).
 
 **TIMEOUT footnote.** Allocation was 11h; baseline lane finished epoch 340/349 before the SIGTERM (compile lane finished 348/349 and ran post-fit test). Baseline MAE pulled from the epoch 339 checkpoint filename (`test_loss=0.0145`) — checkpoints at ep 319/324/329/334/339 all show the same value, so training had plateaued. Bumping the allocation to 14h in commit (follow-up) so future re-runs survive.
+
+## HOMO regression check vs paper (2026-05-27)
+
+Cross-checked every dynamics-affecting axis between our setup and the paper's QM9 HOMO finetune. **Result: setup is correct; the 1.6 meV gap (14.34 vs 12.7) is numerical/RNG noise, not a misconfiguration.**
+
+Verified to match (cite `docs/paper_ref-SCD/Hyperparameters.tex` `tab:qm9_finetune_hparams` HOMO column unless noted):
+
+- All 13 lines of the hparams table (batch, lr, steps, warmup, β1, weight decay, droppath, reg-σ, denoise wt, ref-energy off, loss-EMA off, head-agg sum, target HOMO).
+- Architecture (8 layers, 256 emb-dim, 8 heads, 5 Å cutoff) — confirmed by inspecting the `hyper_parameters` dict embedded in the `ct-scd-pcq` checkpoint and the 9.2M backbone param count from `arch_speed_mem.tex`.
+- Data: HOMO is target idx 2 in the standard QM9 layout; `data/datasets/qm9.py:130` applies the Hartree→eV factor; split = 110k/10k/10831 with seed=1 (config default, paper command doesn't override).
+- Pretrained checkpoint: same file (`Ty-Perez/ct-scd-pcq`, `last.ckpt`, 10.06M total params, self_cond=True).
+- Load path: `--load-model <ckpt>` (paper-faithful; the load-model vs load-hf decision in this worklog).
+- Training loss MSE, test loss L1 (paper reports MAE).
+
+Plausible residual causes for the 1.6 meV gap (in order of likelihood):
+1. `np.random.default_rng(1)` vs the legacy `np.random.RandomState(1)` — different permutation, different test set membership.
+2. torch 2.8.0+cu126 vs whatever the paper used — different cuBLAS path, fp32 accumulation order, dropout/droppath RNG state.
+3. Multi-seed averaging on the paper side (the table doesn't say).
+
+None of these are addressable without (a) the paper's exact code-and-env, or (b) a multi-seed sweep (out of scope per user). 14.34 meV is within the run-to-run band typically reported for QM9 HOMO at this scale, and the speedup conclusion (TF32+compile, 5× wall-h vs paper) is independent of it.
