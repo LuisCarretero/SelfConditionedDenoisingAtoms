@@ -49,7 +49,8 @@ for entry in "${LANES[@]}"; do
   mkdir -p "$LANE_DIR/traces" "$LANE_DIR/experiments"
   echo "[launch] GPU $gpu tag=$tag extra='$extra'" | tee -a "$ROOT/banner.txt"
 
-  CUDA_VISIBLE_DEVICES=$gpu pixi run python -u train.py \
+  # Distinct MASTER_PORT per lane to avoid DDP EADDRINUSE collision.
+  CUDA_VISIBLE_DEVICES=$gpu MASTER_PORT=$((29500 + gpu)) pixi run python -u train.py \
       --conf configs/finetune_qm9.yaml \
       --load-hf ct-scd-pcq \
       --job-id "$tag" \

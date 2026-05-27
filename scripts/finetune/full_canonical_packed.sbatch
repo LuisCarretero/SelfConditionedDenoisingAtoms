@@ -64,7 +64,10 @@ for entry in "${LANES[@]}"; do
   mkdir -p "$LANE_DIR/experiments"
   echo "[launch] GPU $gpu tag=$tag extra='$extra'" | tee -a "$ROOT/banner.txt"
 
-  CUDA_VISIBLE_DEVICES=$gpu pixi run python -u train.py \
+  # Distinct MASTER_PORT per lane — PL still spins up a DDP master with one
+  # GPU under distributed_backend=ddp, and three processes on the same host
+  # otherwise race for the same default port (EADDRINUSE in 2/3 lanes).
+  CUDA_VISIBLE_DEVICES=$gpu MASTER_PORT=$((29500 + gpu)) pixi run python -u train.py \
       --conf configs/finetune_qm9.yaml \
       --load-model "$CKPT" \
       --job-id "$tag" \
