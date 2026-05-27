@@ -10,7 +10,7 @@ W&B project: `SCD-finetune-speedup` (luis-carretero-eth-zurich).
 
 Every measurement we've taken, in submission order. Step ms / throughput / compute-h come from the `[TrainTiming]` summary; wall-h is only available for runs that included the Phase 2.5 callback extension (commit `c0789a1`, 2026-05-26 ~22:00 PDT — everything before is `n/a`). Compute GPU-h is extrapolated to the canonical 300k-step run for probes, and is the actual run cost for full runs. `samp/s = 128 / (ms/1000)`.
 
-| Time (PDT) | Tag | Step (ms) | Thru (samp/s) | Compute GPU-h | Wall GPU-h | Notes |
+| Time (PDT) | Tag | Step (ms) | Thru (samp/s) | Compute GPU-h (train steps only) | Wall GPU-h (incl. per-epoch val+reload+ckpt + post-fit test) | Notes |
 |---|---|---|---|---|---|---|
 | 2026-05-26 19:46 | `probe_kernel_on` | 112.5 ± 4.3 | 1138 | 9.4 | n/a | Phase 1 baseline, kernel on, 3000 steps, `--load-hf` |
 | 2026-05-26 19:53 | `probe_kernel_off` | 111.6 ± 4.0 | 1147 | 9.3 | n/a | Phase 1 kernel A/B (~0% speedup) |
