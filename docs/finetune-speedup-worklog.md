@@ -6,6 +6,25 @@ Hardware reference: NERSC Perlmutter, NVIDIA A100-SXM4-40GB (4× per node), torc
 Paper reference: 46 GPU-h/task, HOMO MAE 12.7 meV (Table 5, A100, single-task QM9 HOMO).
 W&B project: `SCD-finetune-speedup` (luis-carretero-eth-zurich).
 
+## Chronological board
+
+Every measurement we've taken, in submission order. Step ms / throughput / compute-h come from the `[TrainTiming]` summary; wall-h is only available for runs that included the Phase 2.5 callback extension (commit `c0789a1`, 2026-05-26 ~22:00 PDT — everything before is `n/a`). Compute GPU-h is extrapolated to the canonical 300k-step run for probes, and is the actual run cost for full runs. `samp/s = 128 / (ms/1000)`.
+
+| Time (PDT) | Tag | Step (ms) | Thru (samp/s) | Compute GPU-h | Wall GPU-h | Notes |
+|---|---|---|---|---|---|---|
+| 2026-05-26 19:46 | `probe_kernel_on` | 112.5 ± 4.3 | 1138 | 9.4 | n/a | Phase 1 baseline, kernel on, 3000 steps, `--load-hf` |
+| 2026-05-26 19:53 | `probe_kernel_off` | 111.6 ± 4.0 | 1147 | 9.3 | n/a | Phase 1 kernel A/B (~0% speedup) |
+| 2026-05-26 20:07 | `p2_tf32` | 100.3 ± 2.0 | 1276 | 8.4 | n/a | Phase 2 TF32, −10.8% |
+| 2026-05-26 20:07 | `p2_bf16` | crash | — | — | — | `BFloat16 vs Float` in noise_normalizer (deferred) |
+| 2026-05-26 20:12 | `p2_compile_v2` | 91.2 ± 1.4 | 1404 | 7.6 | n/a | Phase 2 compile, −18.9% (after `@torch.compiler.disable()` patch) |
+| 2026-05-26 20:18 | `p2_tf32_compile` | 80.7 ± 1.8 | 1586 | 6.7 | n/a | Phase 2 stack, −28.3% — winner candidate |
+| 2026-05-26 21:27 | `full_*` (53465532) | cancelled | — | — | — | DDP `EADDRINUSE` on 2/3 lanes, fix `a56441a` |
+| 2026-05-26 21:35 | `full_kernel_on` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical baseline, `--load-model`, 349 ep |
+| 2026-05-26 21:35 | `full_tf32` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32 |
+| 2026-05-26 21:35 | `full_tf32_compile` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32+compile |
+
+Update the `_pending_` rows in place as each lane lands `test_loss` + final `[TrainTiming]` line. Append a new row for any follow-up probe (bf16-with-autocast-fix, dataloader sweep, etc).
+
 ## Phase 1 — Baseline
 
 Step times measured by the `TrainTiming` callback (`models/callbacks.py`): `cuda.synchronize`-anchored, mean of the last 200 batches at each epoch end, first 50 batches dropped for warmup.
