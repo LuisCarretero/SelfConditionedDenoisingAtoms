@@ -22,6 +22,15 @@ Operational details (Slurm account, full QoS table, `$SCRATCH` layout, queue wai
   ```bash
   rm -rf .pixi && ln -s $SCRATCH/SCD_data/.pixi .pixi
   ```
+- **Use the whole node.** Perlmutter GPU nodes are 4× A100, and full-node QoS (`premium`, `interactive`) charge for all 4 GPUs regardless of `--gpus=N` — requesting 1 GPU on a full-node QoS leaves 3 idle and 75% of the bill unused. When multiple independent jobs share a hardware footprint (e.g. several finetune ablations), pack them onto one 4-GPU allocation and split via `CUDA_VISIBLE_DEVICES` lanes. Pattern:
+  ```bash
+  #SBATCH --gpus=4
+  for i in 0 1 2 3; do
+    CUDA_VISIBLE_DEVICES=$i pixi run python -u train.py --conf … --job-id run_$i &
+  done
+  wait
+  ```
+  Each lane gets its own log dir / W&B run; outputs are independent. Only skip this when a job genuinely needs DDP across all 4 GPUs.
 
 ## Experiment tracking
 
