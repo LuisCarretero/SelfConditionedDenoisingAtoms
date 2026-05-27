@@ -22,6 +22,9 @@ Every measurement we've taken, in submission order. Step ms / throughput / compu
 | 2026-05-26 21:35 | `full_kernel_on` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical baseline, `--load-model`, 349 ep |
 | 2026-05-26 21:35 | `full_tf32` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32 |
 | 2026-05-26 21:35 | `full_tf32_compile` (53465652) | _pending_ | _pending_ | _pending_ | _pending_ | canonical TF32+compile |
+| 2026-05-26 21:48 | `p2_bf16_fixed` (53466061) | crash | — | — | — | bf16-mixed v1: 2nd dtype-mismatch site in `output_modules.py:135` (`torch.norm` returns fp32 on bf16 input under cuda autocast). Fix in commit `4620983` |
+| 2026-05-26 21:54 | `p2_bf16_fixed2` (53466174) | 125.7 ± 3.9 (ep 0) / 124.3 ± 3.7 (ep 3) | 1029 | regression vs TF32+compile | — | bf16-mixed + TF32 + compile: **net regression**. Dynamo hits `recompile_limit=8` and falls back to eager — autocast introduces too many dtype-variant code paths for the compile cache. |
+| 2026-05-26 22:05 | `p2_bf16_tf32_nocompile` (53466322) | _pending_ | _pending_ | _pending_ | — | bf16-mixed + TF32 without compile — isolates whether bf16 helps when compile isn't fighting it |
 
 Update the `_pending_` rows in place as each lane lands `test_loss` + final `[TrainTiming]` line. Append a new row for any follow-up probe (bf16-with-autocast-fix, dataloader sweep, etc).
 
