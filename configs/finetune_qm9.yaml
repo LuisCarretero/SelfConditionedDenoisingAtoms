@@ -5,6 +5,7 @@ load_hf: null
 # load_hf : ct-scd-pcq # load our pretrained model from hugging-face
 job_id: qm9_homo
 wandb_notes: ""
+wandb_project: SCD-finetune-speedup
 
 model_config: configs/model_configs/scd.yaml
 

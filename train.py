@@ -16,7 +16,7 @@ from data.utils import LoadFromFile, LoadFromCheckpoint, save_argparse, number
 from tqdm import tqdm
 from models.trainer import LTrainer
 from models.model_helper import get_model_checkpoint, create_prior_models
-from models.callbacks import ParityPlot, LimitRun
+from models.callbacks import ParityPlot, LimitRun, TrainTiming
 from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 
 import torch
@@ -105,6 +105,7 @@ def get_args():
     parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
     parser.add_argument('--redirect', type=bool, default=False, help='Redirect stdout and stderr to log_dir/log')
     parser.add_argument('--wandb-notes', default="", type=str, help='Notes passed to wandb experiment.')
+    parser.add_argument('--wandb-project', default=None, type=str, help='W&B project name. Overrides the default SCD_pretraining / SCD_bench_<dataset> heuristic.')
     parser.add_argument('--job-id', default="auto", type=str, help='Job ID. If auto, pick the next available numeric job id.')
     
     # Dataset specific arguments
@@ -340,7 +341,9 @@ def main():
     )
     callbacks.append(checkpoint_callback)
 
-    if args.pretraining:
+    if getattr(args, "wandb_project", None):
+        project_name = args.wandb_project
+    elif args.pretraining:
         project_name = 'SCD_pretraining'
     else:
         ds_name = args.dataset
@@ -368,6 +371,24 @@ def main():
         ddp_strategy = DDPStrategy(find_unused_parameters=True)  # To account for the teacher model
 
     
+    # TrainTiming: per-step wall-clock + extrapolated GPU-h. Cheap, always on.
+    # world_size is what Lightning will resolve at trainer.fit time, but we want
+    # it now for the extrapolation; for ngpus=-1 the default is "all visible".
+    if isinstance(use_devices, int):
+        ws_guess = use_devices if use_devices > 0 else torch.cuda.device_count()
+    elif isinstance(use_devices, (list, tuple)):
+        ws_guess = max(1, len(use_devices))
+    else:
+        ws_guess = 1
+    ws_guess = max(1, ws_guess) * max(1, args.num_nodes)
+    callbacks.append(
+        TrainTiming(
+            num_steps=args.num_steps or 0,
+            batch_size=args.batch_size,
+            world_size=ws_guess,
+        )
+    )
+
     limit_run = None
     if args.max_time_minutes is not None or args.max_epochs_per_run is not None:
         limit_run = LimitRun(minutes=args.max_time_minutes,
