@@ -513,12 +513,19 @@ class LTrainer(LightningModule):
         noise_pred = s_out['noise_pred']
 
         # "use" both outputs of the model's forward (see comment above).
-        noise_pred = noise_pred + pred.sum() * 0 
-        normalized_pos_target = self.model.noise_normalizer(target_noise, update=True)
-        
+        noise_pred = noise_pred + pred.sum() * 0
+        # AccumulatedNormalization has fp32 register_buffers with side-effectful in-place updates;
+        # under bf16 autocast the inputs become bf16 and the in-place += into fp32 buffers raises
+        # "Index put requires source/destination dtypes match". Disable autocast locally.
+        with torch.amp.autocast(device_type='cuda', enabled=False):
+            normalized_pos_target = self.model.noise_normalizer(target_noise.float(), update=True)
+        normalized_pos_target = normalized_pos_target.to(noise_pred.dtype)
+
         loss_pos = loss_fn(noise_pred, normalized_pos_target)
 
-        pred_pos = x1_mask.pos - self.model.noise_normalizer.inverse(noise_pred)
+        with torch.amp.autocast(device_type='cuda', enabled=False):
+            inv_noise_pred = self.model.noise_normalizer.inverse(noise_pred.float())
+        pred_pos = x1_mask.pos - inv_noise_pred.to(x1_mask.pos.dtype)
         true_pos = x1_mask.pos - target_noise
         pos_mae = torch.nn.functional.l1_loss(pred_pos, true_pos)
 
@@ -827,13 +834,20 @@ class LTrainer(LightningModule):
             
             #NOTE: updateing position normalizer may be off in some variants
             # normalized_pos_target = self.model.pos_normalizer(batch.pos_target)
-            normalized_noise = self.model.noise_normalizer(batch.noise, update=self.update_normalizer)
+            # AccumulatedNormalization has fp32 register_buffers with side-effectful in-place updates;
+            # under bf16 autocast the inputs become bf16 and the in-place += into fp32 buffers raises
+            # "Index put requires source/destination dtypes match". Disable autocast locally.
+            with torch.amp.autocast(device_type='cuda', enabled=False):
+                normalized_noise = self.model.noise_normalizer(batch.noise.float(), update=self.update_normalizer)
+            normalized_noise = normalized_noise.to(noise_pred.dtype)
             loss_pos = loss_fn(noise_pred, normalized_noise)
             self.losses[stage + "_pos"].append(loss_pos.detach())
 
             #compute mae with predicted position
             tru_pos = batch.pos - batch.noise
-            pred_pos = batch.pos - self.model.noise_normalizer.inverse(noise_pred)
+            with torch.amp.autocast(device_type='cuda', enabled=False):
+                inv_noise_pred = self.model.noise_normalizer.inverse(noise_pred.float())
+            pred_pos = batch.pos - inv_noise_pred.to(batch.pos.dtype)
             pos_mae = torch.nn.functional.l1_loss(pred_pos, tru_pos)
             # self.losses[stage + "_pos_mae"].append(pos_mae.detach())
 
