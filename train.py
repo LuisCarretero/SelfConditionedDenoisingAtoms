@@ -109,6 +109,7 @@ def get_args():
     parser.add_argument('--tf32', type=str2bool, default=False, help='If true, set float32 matmul precision to "medium" (TF32) on A100/H100 in finetune. Pretraining always enables it (legacy behavior).')
     parser.add_argument('--torch-compile', type=str2bool, default=False, help='If true, torch.compile the SCD backbone (rep_model). Heads and noise normalizers stay eager. Mode controlled by --torch-compile-mode.')
     parser.add_argument('--torch-compile-mode', default='default', choices=['default', 'reduce-overhead', 'max-autotune'], help='Mode passed to torch.compile when --torch-compile is true.')
+    parser.add_argument('--profile-trace-dir', default=None, type=str, help='If set, wrap the trainer in PL\'s PyTorchProfiler. Captures ~200 train steps post-warmup, one val epoch, and the epoch-boundary IO. Pair with --num-epochs 3.')
     parser.add_argument('--job-id', default="auto", type=str, help='Job ID. If auto, pick the next available numeric job id.')
     
     # Dataset specific arguments
@@ -453,6 +454,26 @@ def main():
 
     if ddp_strategy is not None:
         trainer_kwargs["strategy"] = ddp_strategy
+
+    # Phase 2.5: profile a representative window (200 steps post-warmup) plus
+    # one full val epoch and one epoch boundary (reload + ckpt). PL's profiler
+    # only schedules around `training_step`, but the validation/test/IO time is
+    # visible in the trace under the corresponding record_function spans.
+    if args.profile_trace_dir is not None:
+        from pytorch_lightning.profilers import PyTorchProfiler
+        os.makedirs(args.profile_trace_dir, exist_ok=True)
+        pl_profiler = PyTorchProfiler(
+            dirpath=args.profile_trace_dir,
+            filename=f"profile_{args.job_id}",
+            schedule=torch.profiler.schedule(skip_first=80, wait=1, warmup=4, active=200, repeat=1),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(args.profile_trace_dir),
+            record_shapes=False,
+            profile_memory=False,
+            with_stack=False,
+            sort_by_key='self_cuda_time_total',
+        )
+        trainer_kwargs["profiler"] = pl_profiler
+        print(f"[profile] traces will be written to {args.profile_trace_dir}")
 
     trainer = pl.Trainer(**trainer_kwargs)
     trainer.fit(model, data, ckpt_path=checkpoint_path)
