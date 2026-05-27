@@ -90,3 +90,23 @@ def test_planned_train_epochs_takes_min_of_gates():
     )
     tt_epochs_tighter._steps_per_epoch = 860
     assert tt_epochs_tighter._planned_train_epochs() == 10
+
+
+def test_extrapolate_handles_disabled_step_gate():
+    # Whole-epochs config sets num_steps=-1 (PL "no limit") and relies on
+    # num_epochs. A naive `compute_h = step_s × num_steps × ws / 3600` would
+    # produce a negative number and silently invert the comparison.
+    tt = TrainTiming(
+        num_steps=-1,
+        batch_size=128,
+        world_size=1,
+        num_epochs=349,
+        val_interval=1,
+    )
+    _prime(tt, step_s=0.1, epoch_wall_s=100.0, steps_per_epoch=860)
+
+    _, compute_h, wall_h = tt._extrapolate()
+    expected_compute = 0.1 * (349 * 860) / 3600.0
+    assert compute_h == pytest.approx(expected_compute)
+    assert compute_h > 0
+    assert wall_h >= compute_h

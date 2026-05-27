@@ -475,22 +475,29 @@ class TrainTiming(Callback):
         self._test_epoch_s: float | None = None
         self._test_t0: float | None = None
 
+    def _effective_total_steps(self) -> float:
+        # Lightning stops at min(max_steps, max_epochs × steps_per_epoch). When
+        # max_steps is null/-1 (whole-epochs config) the epoch gate decides.
+        gates: list[float] = []
+        if self.num_steps and self.num_steps > 0:
+            gates.append(float(self.num_steps))
+        if self.num_epochs and self._steps_per_epoch:
+            gates.append(float(self.num_epochs * self._steps_per_epoch))
+        return min(gates) if gates else 0.0
+
     def _planned_train_epochs(self) -> float | None:
-        # Lightning stops at min(max_steps, max_epochs). Mirror that here so the
-        # extrapolation matches whatever the run will actually do.
-        n_from_steps = None
-        if self.num_steps and self.num_steps > 0 and self._steps_per_epoch:
-            n_from_steps = self.num_steps / self._steps_per_epoch
-        if self.num_epochs and n_from_steps is not None:
-            return min(self.num_epochs, n_from_steps)
-        return self.num_epochs or n_from_steps
+        total = self._effective_total_steps()
+        if total and self._steps_per_epoch:
+            return total / self._steps_per_epoch
+        return self.num_epochs if self.num_epochs else None
 
     def _extrapolate(self) -> tuple[float, float, float]:
         """Returns (mean_step_s, compute_gpu_h, wall_gpu_h)."""
         if not self._buf:
             return 0.0, 0.0, 0.0
         step_s = float(np.mean(self._buf))
-        compute_h = step_s * self.num_steps / 3600.0 * self.world_size
+        total_steps = self._effective_total_steps()
+        compute_h = step_s * total_steps / 3600.0 * self.world_size
 
         wall_h = compute_h
         train_epochs = self._planned_train_epochs()
@@ -500,7 +507,7 @@ class TrainTiming(Callback):
             epoch_wall_s = float(np.median(self._epoch_wall_buf))
             overhead_s = max(0.0, epoch_wall_s - step_s * self._steps_per_epoch)
             total_overhead_s = overhead_s * train_epochs
-            wall_h = (step_s * self.num_steps + total_overhead_s) * self.world_size / 3600.0
+            wall_h = (step_s * total_steps + total_overhead_s) * self.world_size / 3600.0
         if self._test_epoch_s is not None:
             wall_h += self._test_epoch_s * self.world_size / 3600.0
         return step_s, compute_h, wall_h
@@ -570,6 +577,7 @@ class TrainTiming(Callback):
             return
         step_s, compute_h, wall_h = self._extrapolate()
         std_s = float(np.std(self._buf))
+        total_steps = int(self._effective_total_steps())
         epoch_overhead_s = 0.0
         if self._epoch_wall_buf and self._steps_per_epoch:
             epoch_overhead_s = max(
@@ -580,7 +588,7 @@ class TrainTiming(Callback):
             f"step={step_s*1000:.1f}±{std_s*1000:.1f} ms  "
             f"thru={self.batch_size/step_s:.1f} samp/s  "
             f"epoch_overhead={epoch_overhead_s:.1f}s  "
-            f"compute GPU-h({self.num_steps} steps × {self.world_size})={compute_h:.1f}  "
+            f"compute GPU-h({total_steps} steps × {self.world_size})={compute_h:.1f}  "
             f"wall GPU-h={wall_h:.1f}",
             flush=True,
         )
