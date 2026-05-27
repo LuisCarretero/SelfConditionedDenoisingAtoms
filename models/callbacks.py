@@ -413,6 +413,105 @@ class LimitRun(Callback):
 
 
 
+class TrainTiming(Callback):
+    """Per-step wall-time + extrapolated GPU-h logging for finetune runs.
+
+    Why this exists: we need a precise GPU-h/task estimate before committing to a
+    300k-step run, and to A/B speedup changes against a stable baseline.
+
+    Each `on_train_batch_end` records elapsed wall time since the previous batch
+    (excluding val, which Lightning pauses between). We skip the first
+    `warmup_batches` measurements — CUDA/cuDNN warmup, dataloader spin-up, and
+    PL's epoch-init bookkeeping inflate the first batches and would bias any
+    rolling mean.
+
+    Logs per-step `train/step_time_ms`, `train/throughput_samp_per_s`, and
+    `train/extrapolated_gpu_h_total` (using `num_steps * world_size`) so a short
+    probe is enough to predict the full-run cost. Prints a summary line at
+    epoch end. All logging is gated to global_rank==0 to avoid DDP duplication.
+    """
+
+    def __init__(
+        self,
+        num_steps: int,
+        batch_size: int,
+        world_size: int = 1,
+        warmup_batches: int = 50,
+        window: int = 200,
+        log_every: int = 50,
+    ):
+        super().__init__()
+        self.num_steps = num_steps
+        self.batch_size = batch_size
+        self.world_size = world_size
+        self.warmup_batches = warmup_batches
+        self.window = window
+        self.log_every = log_every
+        self._buf: list[float] = []
+        self._last_t: float | None = None
+        self._seen: int = 0
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        # Reset the inter-batch clock — the gap across an epoch boundary spans
+        # validation + dataloader recreation, which would skew the next sample.
+        self._last_t = None
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        # Use a CUDA sync to make wall-time reflect actual GPU completion, not
+        # just kernel-launch queueing. Cheap (one event/step) vs the value of
+        # accurate per-step numbers.
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        now = time.perf_counter()
+        if self._last_t is None:
+            self._last_t = now
+            return
+        dt = now - self._last_t
+        self._last_t = now
+        self._seen += 1
+
+        if self._seen <= self.warmup_batches:
+            return
+        self._buf.append(dt)
+        if len(self._buf) > self.window:
+            self._buf.pop(0)
+
+        if trainer.global_rank != 0:
+            return
+        if self._seen % self.log_every != 0:
+            return
+
+        arr = np.asarray(self._buf)
+        step_ms = float(arr.mean() * 1000.0)
+        thru = self.batch_size / float(arr.mean())
+        gpu_h_total = float(arr.mean()) * self.num_steps / 3600.0 * self.world_size
+        if trainer.logger is not None:
+            trainer.logger.log_metrics(
+                {
+                    "train/step_time_ms": step_ms,
+                    "train/step_time_ms_std": float(arr.std() * 1000.0),
+                    "train/throughput_samp_per_s": thru,
+                    "train/extrapolated_gpu_h_total": gpu_h_total,
+                },
+                step=trainer.global_step,
+            )
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        if trainer.global_rank != 0 or len(self._buf) < 5:
+            return
+        arr = np.asarray(self._buf)
+        mean_s = float(arr.mean())
+        std_s = float(arr.std())
+        gpu_h_total = mean_s * self.num_steps / 3600.0 * self.world_size
+        print(
+            f"[TrainTiming] epoch {trainer.current_epoch}: "
+            f"step={mean_s*1000:.1f}±{std_s*1000:.1f} ms  "
+            f"thru={self.batch_size/mean_s:.1f} samp/s  "
+            f"extrapolated GPU-h({self.num_steps} steps × {self.world_size} GPU)={gpu_h_total:.1f}",
+            flush=True,
+        )
+
+
 def _save_checkpoint(out_path, trainer, reason="time limit"):
         """Helper method to save checkpoint and stop training"""
         
