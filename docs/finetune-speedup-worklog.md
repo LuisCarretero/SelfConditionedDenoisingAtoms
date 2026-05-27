@@ -31,12 +31,34 @@ Method: 3000-step probes (`scripts/finetune/probe_ablation.sbatch`) for each lev
 | `--torch-compile True` (mode=default, dynamic=True) | 91.2 ± 1.4 (epoch 3) | **−18.9%** ✅ | 0.0601 ≈ 60.1 meV | `p2_compile_v2_20260526-201259` | First attempt blew up on the TorchMD-Net `get_neighbor_pairs` op — upstream's C++ registration declares the python fake impl in `torchmdnet.extensions` but we host it at `models.ET_models.extensions`, so Dynamo's `set_python_module` check refused to trace. Fix: `@torch.compiler.disable()` on `get_neighbor_pairs_kernel` (kept opaque to Dynamo, still runs as the compiled CUDA op). Recompile spikes at epoch boundaries inflate epoch-1 std; mean is stable by epoch 2. |
 | **Stack: `--tf32 True --torch-compile True`** | **80.7 ± 1.8 (epoch 2)** | **−28.3%** ✅✅ | 0.0521 ≈ 52.1 meV | `p2_tf32_compile_20260526-201828` | Speedups multiply cleanly: (1−0.108)(1−0.189) = 0.723 ⇒ predicts −27.7%; measured −28.3%. MAE at 3000 steps is actually lower than baseline (probe-noise territory). This is the Phase 2 winner candidate; submitted as `full_tf32_compile` for the 300k-step MAE confirmation. |
 
-## Pending full runs (queued in NERSC `regular`)
+## Phase 2.5 — Apples-to-apples GPU-h + val profiling
 
-| Slurm JobID | W&B job_id | Lever | Status |
-|---|---|---|---|
-| 53461802 | `full_kernel_on` (auto-suffixed) | none (Phase 1 baseline) | PENDING |
-| 53462549 | `full_tf32` | `--tf32 True` | PENDING |
-| 53462886 | `full_tf32_compile` | `--tf32 True --torch-compile True` | PENDING |
+Three changes landed before the canonical resubmission to make the GPU-h figure comparable to the paper's 46:
 
-All three live in `$SCRATCH/SCD_data/finetune_runs/<jobid>_<tag>/` once they start. The next agent's first job is to surface their MAE numbers, fill in the `_pending_` cells above, and update the plan's acceptance verdict.
+- **`TrainTiming` now reports both compute-only and wall-clock-honest GPU-h.** `train/extrapolated_gpu_h_total` is unchanged (compute only — kept for probe-to-probe stability). New `train/extrapolated_wall_h_total` adds per-epoch overhead (full-epoch wall − step×steps_per_epoch, captures val + reload + ckpt) × planned-epochs + post-fit `trainer.test()`. Epoch-end summary prints both. Regression tests in `tests/test_traintiming.py` guard the `_extrapolate` math (commits `c0789a1`, `e474f9e`).
+- **Canonical config switched to whole epochs.** `num_epochs: 349, num_steps: -1` (= 300,140 steps via 860 batches/epoch — closest integer-epoch match to the paper's 300k). Removes the partial-tail epoch and keeps train/val ratio stable across arms (commit `e0effc0`).
+- **Profile sbatch** (`scripts/finetune/profile_run.sbatch`) packs two lanes (baseline, tf32+compile) on one premium node with `--profile-trace-dir` enabling PL's PyTorchProfiler. 200-step train window post-warmup + one val epoch + one epoch boundary. Run when needed to break down train vs val vs IO share (commit `e01aa6c`).
+
+## `--load-model` vs `--load-hf` — paper-faithful decision
+
+The paper's reference command (`python train.py --conf … --load-model …`) and our sbatches diverged on this. Investigation:
+
+- `models/ET_models/scd_model.py:312-326` uses `model.mean`/`model.std` **inside the forward pass**: atom outputs are scaled by `std` before reduce, then `mean` is added to the molecular total. This is data-side/loss-affecting, not cosmetic output rescaling.
+- The `ct-scd-pcq` pretrain has no y-target → `data.mean`/`std` were `None` during pretraining → checkpoint stores `mean=0`, `std=1`.
+- `--load-model` keeps those (mean=0, std=1). Model emits HOMO in physical units; head learns the full ~−0.4 eV range.
+- `--load-hf` (current sbatch path) overwrites with QM9 HOMO data mean/std (≈−0.4 eV / ≈0.04 eV). Model emits normalized internally; gradient on the atom-output projection is multiplied by `std`, giving ~25× smaller effective LR on that layer.
+
+**Decision: canonical full runs use `--load-model`** to match the paper. All Phase 1/2 probes ran with `--load-hf`, so the speedup % deltas (TF32 −10.8%, compile −18.9%, stacked −28.3%) stand (orthogonal to the load path), but the full-run MAE column establishes a new paper-faithful baseline rather than comparing to the Phase 1 probe MAE (which is undertrained anyway).
+
+## Pending full runs (packed on one `gpu_premium` 4-GPU node)
+
+| Slurm JobID | Lane | W&B job_id | Lever | Status |
+|---|---|---|---|---|
+| _pending_ | 0 | `full_kernel_on` | none (paper-faithful baseline) | not yet submitted |
+| _pending_ | 1 | `full_tf32` | `--tf32 True` | not yet submitted |
+| _pending_ | 2 | `full_tf32_compile` | `--tf32 True --torch-compile True` | not yet submitted |
+| _idle_ | 3 | — | — | reserved (bf16-mixed once autocast fix lands) |
+
+Submission script: `scripts/finetune/full_canonical_packed.sbatch`. All lanes use `--load-model` against the local `ct-scd-pcq` checkpoint. Each runs 349 epochs ≈ 9.5h wall on the slowest arm. Logs at `$SCRATCH/SCD_data/finetune_runs/<jobid>_canonical/<tag>/train.log`.
+
+Acceptance: HOMO MAE ≤ 14 meV for the baseline lane (paper 12.7 meV ± 10%). Phase 2 candidates additionally within ±0.5 meV of the baseline lane (training-dynamics invariant). Report both `compute GPU-h` and `wall GPU-h` (the latter is the apples-to-apples comparison to the paper's 46).
