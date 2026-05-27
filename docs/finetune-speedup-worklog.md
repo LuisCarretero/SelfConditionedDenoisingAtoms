@@ -8,7 +8,7 @@ W&B project: `SCD-finetune-speedup` (luis-carretero-eth-zurich).
 
 ## Chronological board
 
-Every measurement we've taken, in submission order. Step ms / throughput / compute-h come from the `[TrainTiming]` summary; wall-h is only available for runs that included the Phase 2.5 callback extension (commit `c0789a1`, 2026-05-26 ~22:00 PDT — everything before is `n/a`). Compute GPU-h is extrapolated to the canonical 300k-step run for probes, and is the actual run cost for full runs. `samp/s = 128 / (ms/1000)`.
+Every measurement we've taken, in submission order. Step ms / throughput / compute-h come from the `[TrainTiming]` summary; wall-h is only available for runs that included the Phase 2.5 callback extension (commit `c0789a1`, 2026-05-26 ~22:00 PDT — everything before is `n/a`). Compute GPU-h is extrapolated to the canonical 300k-step run for probes, and is the actual run cost for full runs. `samp/s = bs / (ms/1000)` per rank (= aggregate at world_size=1).
 
 | Time (PDT) | Tag | Step (ms) | Thru (samp/s) | Compute GPU-h (train steps only) | Wall GPU-h (incl. per-epoch val+reload+ckpt + post-fit test) | Notes |
 |---|---|---|---|---|---|---|
@@ -25,6 +25,8 @@ Every measurement we've taken, in submission order. Step ms / throughput / compu
 | 2026-05-26 21:48 | `p2_bf16_fixed` (53466061) | crash | — | — | — | bf16-mixed v1: 2nd dtype-mismatch site in `output_modules.py:135` (`torch.norm` returns fp32 on bf16 input under cuda autocast). Fix in commit `4620983` |
 | 2026-05-26 21:54 | `p2_bf16_fixed2` (53466174) | 125.7 ± 3.9 (ep 0) / 124.3 ± 3.7 (ep 3) | 1029 | regression vs TF32+compile | — | bf16-mixed + TF32 + compile: **net regression**. Dynamo hits `recompile_limit=8` and falls back to eager — autocast introduces too many dtype-variant code paths for the compile cache. |
 | 2026-05-26 22:09 | `p2_bf16_tf32_nocompile` (53466322) | 133.1 ± 2.9 (ep 3) | 962 | regression vs TF32 alone (+33%) | — | bf16+TF32 no compile: **−33% vs TF32 alone (100→133 ms)**. bf16 is a net regression with OR without compile. Likely cause: SCD attention is per-edge small-matrix work (head_dim 16–32), not the dense matmuls where bf16 throughput pays off; autocast overhead + frequent bf16↔fp32 casts dominate. **bf16-mixed rejected for this workload.** |
+| 2026-05-27 09:29 | `probe_ddp4_bs128` (53484720) | 119.0 ± 2 (ep 12) | 1076 per-rank (4304 agg) | 39.7 | ~51 | **4-GPU DDP at bs=128/rank, eff_bs=512** — paper-faithful effective batch (author-confirmed). Step time +4% vs single-GPU baseline (114→119) = 94.5% DDP scaling. Extrapolation to 300k steps lands near paper's 46 GPU-h. Triggered the "effective-batch correction" section below. |
+| 2026-05-27 11:31 | `probe_bs512_baseline` (53488816) | 331.0 ± 4.1 (ep 13) | 1547 | 27.6 | ~32 | **1-GPU bs=512 baseline** (no levers) — fair single-GPU equivalent of paper's eff_bs=512 dynamics. ms/step is 2.90× the bs=128 baseline (sub-linear: per-step fixed-cost amortizes over 4× more samples). At 1547 samp/s this beats the bs=128+TF32+compile winner (1429) even WITHOUT levers — batch-size amortization > TF32+compile gain at bs=128. |
 
 Update the `_pending_` rows in place as each lane lands `test_loss` + final `[TrainTiming]` line. Append a new row for any follow-up probe (bf16-with-autocast-fix, dataloader sweep, etc).
 
@@ -128,3 +130,29 @@ Plausible residual causes for the 1.6 meV gap (in order of likelihood):
 3. Multi-seed averaging on the paper side (the table doesn't say).
 
 None of these are addressable without (a) the paper's exact code-and-env, or (b) a multi-seed sweep (out of scope per user). 14.34 meV is within the run-to-run band typically reported for QM9 HOMO at this scale, and the speedup conclusion (TF32+compile, 5× wall-h vs paper) is independent of it.
+
+## Effective-batch correction (2026-05-27) — paper used 4×128 DDP, eff_bs=512
+
+The SCD author confirmed (direct communication) that the paper's QM9 HOMO finetune ran **4-GPU DDP at batch=128/rank, effective batch 512** — matching the pretrain hparam table's 4×A100 convention (`docs/paper_ref-SCD/Hyperparameters.tex:51-53`), not the single-GPU eff_bs=128 setup we assumed. **This overturns the Verdict's "5× wall faster than paper" framing**: our 9.2 wall GPU-h ran the same 300k optimizer steps but at ¼ the effective batch, so we processed 38.4M vs the paper's 153.6M samples — a smaller training run, not a faster one. The HOMO regression check above attributed the 1.6 meV gap to RNG/cuBLAS noise; part of that gap is plausibly **undertraining** at the lower effective batch.
+
+Throughput cross-comparison — this work + propbench QM9 HOMO reference cells (table structured after [`headline_table.md`](../../MLIP_propbench/scripts/propbench/analysis/outputs/headline_table.md) in `../MLIP_propbench`). `bs (g/r)` = global × per-rank; ms/step is the late-epoch TrainTiming mean (warmup skipped); wall GPU-h is the apples-to-apples figure (compute + per-epoch val/reload/ckpt + post-fit test), extrapolated to 300k steps for probes / actual for full runs.
+
+| setup | bs (g/r) | ms/step | steps [1e3] | samples [1e6] | wall GPU-h | samp / (GPU·s) | MAE (meV) | source |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| Paper CT-SCD QM9 HOMO | 512 (4×128) DDP | — | 300 | 153.6 | **46** | 928 | **12.7** | `docs/paper_ref-SCD/scd_vs_jmp_qm9.tex:16` + author confirmation |
+| Ours, 4-GPU DDP baseline (probe→300k) | 512 (4×128) DDP | 119 | 300 | 153.6 | ~51 | 837 | n/a (probe undertrained) | board: `probe_ddp4_bs128` (slurm 53484720) |
+| Ours, 1-GPU bs=128 baseline (full) | 128 (1×128) | 114 | 300 | 38.4 | 11.3 | 944 | 14.5 | board: `full_kernel_on` (53465652 lane 0) |
+| Ours, 1-GPU bs=128 TF32+compile (full) | 128 (1×128) | 89.6 | 300 | 38.4 | 9.2 | 1159 | 14.34 | board: `full_tf32_compile` (53465652 lane 2) |
+| **Ours, 1-GPU bs=512 baseline (probe→300k)** | **512 (1×512)** | **331** | 300 | 153.6 | **~32** | **1322** | n/a (probe undertrained) | board: `probe_bs512_baseline` (slurm 53488816) |
+| propbench MACE-FT (e2e) | 128 (1×128) | 50 | 190* | 24.3 | 2.6 | 2598 | 30.3 | `../MLIP_propbench/scripts/propbench/analysis/outputs/headline_table.md:15` |
+| propbench ORB-FT (e2e) | 128 (1×128) | 130 | 143* | 18.3 | 5.1 | 997 | 19.0 | `../MLIP_propbench/scripts/propbench/analysis/outputs/headline_table.md:16` |
+| propbench UMA-FT (e2e) | 128 (4×32) DDP | 289 | 157* | 20.1 | 50.2 | 111 | 7.8 | `../MLIP_propbench/scripts/propbench/analysis/outputs/headline_table.md:17` |
+
+(*=early-stopped before max_epochs in propbench cells.)
+
+Observations:
+- 4-GPU DDP at eff_bs=512 extrapolates to ~51 wall GPU-h — within 11% of the paper's 46. DDP scales at 94.5% (119 vs 114 ms/step per-rank).
+- propbench UMA-FT (50.2 GPU-h, 291M params, 4×32 DDP at eff_bs=128, 157k steps) lands in the same band by coincidence — different model, bs, step count, similar total compute.
+- The 1-GPU bs=512 row is the fair single-GPU replication of the paper's training dynamics (same effective batch, same 300k steps); its ms/step pins down whether the single-GPU bs=128 winner's speedup levers transfer to the larger-batch regime.
+
+Resolution: future "vs paper" comparisons should either (a) run 4-GPU DDP at bs=128/rank, or (b) run 1-GPU at bs=512 — both preserve the paper's effective batch and step count, hence training dynamics. The TF32+compile winner at bs=128 stays as the "best single-GPU bs=128 number we have", but it's not a paper replication.
