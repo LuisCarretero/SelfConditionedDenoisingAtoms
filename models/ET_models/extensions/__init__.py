@@ -75,6 +75,13 @@ def is_current_stream_capturing():
     return _is_current_stream_capturing()
 
 
+# torch.compile / dynamo cannot trace this op cleanly: the upstream TorchMD-Net
+# C++ registration in extensions/torchmdnet_extensions.cpp:48 declares the fake
+# impl lives in `torchmdnet.extensions`, but we host the python wrappers at
+# `models.ET_models.extensions`, so Dynamo's set_python_module check fails. Until
+# the registration is fixed, mark this opaque to compile so callers still get the
+# fast kernel and Dynamo just treats it as a black box.
+@torch.compiler.disable()
 def get_neighbor_pairs_kernel(
     strategy: str,
     positions: Tensor,

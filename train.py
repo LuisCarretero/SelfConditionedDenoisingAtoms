@@ -92,7 +92,7 @@ def get_args():
     parser.add_argument('--num-nodes', type=int, default=1, help='Number of nodes')
     parser.add_argument('--distributed-backend', default='ddp', help='Distributed backend: dp, ddp, ddp2')
     parser.add_argument('--num-workers', type=int, default=4, help='Number of workers for data prefetch')
-    parser.add_argument('--precision', type=int, default=32, choices=[16, 32], help='Floating point precision')
+    parser.add_argument('--precision', default=32, help='PL precision. Accepts ints (32, 16) or strings ("bf16-mixed", "16-mixed"); passed through to Trainer.')
 
     parser.add_argument('--splits', default=None, help='Npz with splits idx_train, idx_val, idx_test')
     parser.add_argument('--train-size', type=number, default=None, help='Percentage/number of samples in training set (None to use all remaining samples)')
@@ -106,6 +106,9 @@ def get_args():
     parser.add_argument('--redirect', type=bool, default=False, help='Redirect stdout and stderr to log_dir/log')
     parser.add_argument('--wandb-notes', default="", type=str, help='Notes passed to wandb experiment.')
     parser.add_argument('--wandb-project', default=None, type=str, help='W&B project name. Overrides the default SCD_pretraining / SCD_bench_<dataset> heuristic.')
+    parser.add_argument('--tf32', type=str2bool, default=False, help='If true, set float32 matmul precision to "medium" (TF32) on A100/H100 in finetune. Pretraining always enables it (legacy behavior).')
+    parser.add_argument('--torch-compile', type=str2bool, default=False, help='If true, torch.compile the SCD backbone (rep_model). Heads and noise normalizers stay eager. Mode controlled by --torch-compile-mode.')
+    parser.add_argument('--torch-compile-mode', default='default', choices=['default', 'reduce-overhead', 'max-autotune'], help='Mode passed to torch.compile when --torch-compile is true.')
     parser.add_argument('--job-id', default="auto", type=str, help='Job ID. If auto, pick the next available numeric job id.')
     
     # Dataset specific arguments
@@ -262,16 +265,15 @@ def main():
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_ids
         print(f"Set CUDA_VISIBLE_DEVICES to: {args.gpu_ids}")
     
-    # Optimize for Tensor Cores on A100 GPUs
+    # Optimize for Tensor Cores on A100/H100 GPUs. The original gate restricted
+    # this to `pretraining=True`; the Phase 2 `--tf32` flag opts in for finetune.
     gpu_name = torch.cuda.get_device_name(0)
-    if args.pretraining:
-        if 'A100' in gpu_name or 'H100' in gpu_name:
-            torch.set_float32_matmul_precision('medium')
-            print(f"Enabled Tensor Core optimization for {gpu_name}")
-        else:
-            print(f"GPU: {gpu_name} - keeping default precision")
+    tc_eligible = 'A100' in gpu_name or 'H100' in gpu_name
+    if (args.pretraining or args.tf32) and tc_eligible:
+        torch.set_float32_matmul_precision('medium')
+        print(f"Enabled TF32 matmul (set_float32_matmul_precision='medium') for {gpu_name}")
     else:
-        print(f"Fine-tuning run - keeping default precision")
+        print(f"GPU: {gpu_name} - keeping default fp32 matmul precision (no TF32)")
     
     use_devices = args.use_devices  # local: user-specified list, e.g. [0] or [0,1,2]
 
@@ -329,6 +331,19 @@ def main():
                                               std=data.std)
     else:
         model = LTrainer(args, prior_model=prior_models, mean=data.mean, std=data.std)
+
+    if args.torch_compile:
+        # Compile only the backbone (rep_model). Heads and noise normalizers stay eager —
+        # noise_normalizer is an AccumulatedNormalization with side-effectful update_statistics()
+        # that compile would have to special-case, and heads are tiny so compiling them is noise.
+        # `dynamic=True` lets a single graph cover the variable-atom-count QM9 batches; otherwise
+        # every distinct batch shape triggers a fresh compile and obliterates the speedup.
+        print(f"Applying torch.compile(mode='{args.torch_compile_mode}', dynamic=True) to model.model.rep_model")
+        model.model.rep_model = torch.compile(
+            model.model.rep_model,
+            mode=args.torch_compile_mode,
+            dynamic=True,
+        )
 
     callbacks = []
     checkpoint_callback = ModelCheckpoint(
