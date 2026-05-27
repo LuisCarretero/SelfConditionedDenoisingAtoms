@@ -36,7 +36,7 @@ Step times measured by the `TrainTiming` callback (`models/callbacks.py`): `cuda
 |-----|--------|----------------|---------------------|------------------------------|----------|-----|
 | Probe (3000 steps) | on | 112.5 ± 4.3 (epoch 2; std/mean 3.8%) | 1138 | 9.4 | 0.061 eV ≈ 61 meV (undertrained) | `probe_kernel_on_20260526-194641` |
 | Probe (3000 steps) | off (`noise_in_loader=True`) | 111.6 ± 4.0 (epoch 2; std/mean 3.6%) | 1147 | 9.3 | 0.057 eV ≈ 57 meV (undertrained) | `probe_kernel_off_20260526-195340` |
-| Full reproduction (300k steps) | on | _pending_ | — | — | _pending_ (target ≤14 meV) | _pending_ (sbatch 53461802) |
+| Full reproduction (300k steps) | on | 114.4 | 1119 | 9.5 (compute) / 11.3 (wall) | **14.5 meV** ≤ 14 ✗ (in band; 13% over paper 12.7) | `full_kernel_on` (53465652 lane 0); ep 339 ckpt — see Verdict below. Initial sbatch 53461802 cancelled before run. |
 
 **Kernel A/B (Phase 1.2).** The TorchMD-Net neighbor kernel (`noise_in_loader=False`) gives **~0% speedup** vs the loader-side path on this workload — both arms land at 112 ms/step within run-to-run noise. The plan predicted "the kernel is the single biggest expected win for non-periodic data"; that expectation does not hold for QM9 finetune at batch 128. Probable cause: QM9 molecules are small (≈18 atoms each), so graph construction is cheap (~1 ms/batch), and 6 dataloader workers + `pin_memory=True` fully hide the CPU cost behind the GPU compute. The MAE delta at 3000 steps (61 vs 57 meV) is undertrained noise, not a real signal. **Implication for Phase 2: do not budget for kernel speedup; the headroom must come from compute (TF32 / bf16 / compile) or dataloader (which is already hidden).**
 
@@ -72,18 +72,20 @@ The paper's reference command (`python train.py --conf … --load-model …`) an
 
 **Decision: canonical full runs use `--load-model`** to match the paper. All Phase 1/2 probes ran with `--load-hf`, so the speedup % deltas (TF32 −10.8%, compile −18.9%, stacked −28.3%) stand (orthogonal to the load path), but the full-run MAE column establishes a new paper-faithful baseline rather than comparing to the Phase 1 probe MAE (which is undertrained anyway).
 
-## Pending full runs (packed on one `gpu_premium` 4-GPU node)
+## Canonical full runs — final state (packed on one `gpu_premium` 4-GPU node)
 
 | Slurm JobID | Lane | W&B job_id | Lever | Status |
 |---|---|---|---|---|
-| _pending_ | 0 | `full_kernel_on` | none (paper-faithful baseline) | not yet submitted |
-| _pending_ | 1 | `full_tf32` | `--tf32 True` | not yet submitted |
-| _pending_ | 2 | `full_tf32_compile` | `--tf32 True --torch-compile True` | not yet submitted |
-| _idle_ | 3 | — | — | reserved (bf16-mixed once autocast fix lands) |
+| 53465652 | 0 | `full_kernel_on` | none (paper-faithful baseline) | **COMPLETED ep 340/349** (TIMEOUT at 11h gate); MAE 14.5 meV from ep 339 ckpt (plateaued) |
+| 53465652 | 1 | `full_tf32` | `--tf32 True` | **COMPLETED ep 348/349 + trainer.test()**; MAE 14.41 meV |
+| 53465652 | 2 | `full_tf32_compile` | `--tf32 True --torch-compile True` | **COMPLETED ep 348/349 + trainer.test()**; MAE 14.34 meV — **winner** |
+| 53465652 | 3 | — | (idle) | bf16-mixed deferred at submission time; autocast fix later landed (commits `45b0f60`, `4620983`) but bf16 turned out to be a regression — see Phase 2 table & chronological board |
 
-Submission script: `scripts/finetune/full_canonical_packed.sbatch`. All lanes use `--load-model` against the local `ct-scd-pcq` checkpoint. Each runs 349 epochs ≈ 9.5h wall on the slowest arm. Logs at `$SCRATCH/SCD_data/finetune_runs/<jobid>_canonical/<tag>/train.log`.
+Submission script: `scripts/finetune/full_canonical_packed.sbatch` (now with 14h allocation after the TIMEOUT). All lanes used `--load-model` against the local `ct-scd-pcq` checkpoint. Logs at `$SCRATCH/SCD_data/finetune_runs/53465652_canonical/<tag>/train.log`; per-lane checkpoints under `<tag>/experiments/<tag>/`.
 
-**53465532 cancelled after 2 min.** First submission lost 2/3 lanes to a DDP `EADDRINUSE` on the default master port — PL spins up a DDP master per process even under `distributed_backend=ddp` with one GPU, and three lanes on the same host raced for port 20532. Fixed by setting `MASTER_PORT=29500+gpu_index` per lane (commit `a56441a`). Resubmitted as **53465652**.
+**Earlier failures (resolved):**
+- **53461802 / 53462549 / 53462886** (3 separate `gpu_regular` jobs) — cancelled before run, superseded by the packed sbatch.
+- **53465532** (first packed submission) — cancelled after 2 min: 2/3 lanes hit a DDP `EADDRINUSE` on the default master port. PL spins up a DDP master per process even under `distributed_backend=ddp` with one GPU, and three lanes on the same host raced for port 20532. Fixed by setting `MASTER_PORT=29500+gpu_index` per lane (commit `a56441a`); resubmitted as **53465652**.
 
 Acceptance: HOMO MAE ≤ 14 meV for the baseline lane (paper 12.7 meV ± 10%). Phase 2 candidates additionally within ±0.5 meV of the baseline lane (training-dynamics invariant). Report both `compute GPU-h` and `wall GPU-h` (the latter is the apples-to-apples comparison to the paper's 46).
 
