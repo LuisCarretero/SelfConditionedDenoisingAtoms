@@ -117,6 +117,16 @@ No fixed target. Phase 2.2 is the conservative pass (TF32 + bf16 + compile + dat
 
 ---
 
+## Phase 2.5 — Apples-to-apples GPU-h + val profiling
+
+Three follow-ups surfaced from comparing our runs against the paper's reference command `python train.py --conf configs/finetune_qm9.yaml --load-model … --job-id pretrained_qm9-homo`. The paper's 46 GPU-h figure is end-to-end wall-clock; our current `train/extrapolated_gpu_h_total` is only the train-step compute slice (val, dataloader-reload, post-fit `trainer.test()`, and PL sanity-val all excluded). That's a real apples-vs-oranges gap in any "X GPU-h vs 46" claim.
+
+- **Make `TrainTiming` wall-clock-honest.** Today: `extrapolated_gpu_h_total = step_time_s × num_steps × world_size / 3600`. Extend it to: time one val epoch once post-warmup, add `(num_train_epochs / val_interval) × val_epoch_s / 3600`; add a one-shot `test_epoch_s / 3600` for the post-fit test; account for `reload_dataloaders_every_n_epochs=1` overhead (probably small, but include it). Report both the compute-only and wall-clock-honest numbers so the comparison basis is explicit.
+- **Profile train vs val vs IO (extends Phase 2.1).** The current profiler ask covers a 200-step train window. Extend it to also cover one full val epoch and one epoch boundary (dataloader-reload + checkpoint write). Outputs: train-step CUDA-time, val-step CUDA-time, dataloader stall, checkpoint-write seconds, fraction of wall time spent in val. Re-run with the Phase 2 winner (`--tf32 True --torch-compile True`) — likely the val pass benefits from compile too (same forward graph), but check whether val's share of wall time grows or shrinks under the speedup, since that determines whether further work should target train or val.
+- **Run whole epochs for the canonical full run.** Current `num_steps: 300000` resolves to 349.05 epochs (last epoch is cut short), shifting the train/val ratio slightly. Switch to `num_epochs: 349, num_steps: null` (or 350 — choose whichever lands closer to the paper's implied 300k). Removes a small ambiguity in step/val counting and makes per-epoch comparisons clean across the speedup arms.
+
+Acceptance basis update: HOMO MAE gate (≤ 14 meV) is unchanged, but the GPU-h figure reported alongside it must be the wall-clock-honest one so "X GPU-h vs paper's 46" is a real comparison rather than a strict-undercount.
+
 ## Out of scope (for this work item)
 - Other QM9 targets, Matbench, LBA — those are propbench's job.
 - Pretraining changes.
